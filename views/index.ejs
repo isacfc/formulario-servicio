@@ -1,68 +1,86 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="/css/styles.css" rel="stylesheet">
   <title>Formulario - Poder Judicial</title>
 </head>
+
 <body class="text-lg bg-gray-100 flex justify-center items-center min-h-screen">
-  <form class="bg-white p-6 rounded-[30px] shadow-2xl max-w-md w-full">
+
+  <header class="fixed top-0 left-0 w-full bg-green-400 shadow-md p-4 flex justify-center">
+    <label class="text 3xl font-bold text-white">PODER JUDICIAL DEL ESTADO DE HIDALGO</label>
+  </header>
+  <form class="mt-20 m-4 bg-white p-6 rounded-[30px] shadow-2xl max-w-md">
     <div>
-      <div class="-mr-6 -ml-6 -mt-6  mb-4 rounded-t-[30px] p-3 bg-emerald-700">
-          <h2 class=" text-3xl font-bold text-center text-white ">Información de los Trabajadores</h2>
+      <div class="-mr-6 -ml-6 -mt-6  mb-4 rounded-t-[30px] p-6 bg-emerald-700">
+        <h2 class=" text-2xl font-bold text-center text-white ">Información de los Trabajadores</h2>
       </div>
 
       <label class="block mb-2 text-2xl font-bold text-black"> ¡Bienvenido! </label>
       <label class="block mb-2">Nombre(s)</label>
-      <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
+      <input type="text" class="border w-full p-2 mb-4 rounded-md" placeholder="Nombre(s)"
+        oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('Ingrese nombre(s) valido(s)')" required>
       <label class="block mb-2">Apellido Paterno</label>
-      <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
+      <input type="text" class="border w-full p-2 mb-4 rounded-md " placeholder="Apellido Paterno"
+        oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('Ingrese su apellido paterno ')"
+        required>
       <label class="block mb-2">Apellido Materno</label>
-      <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
+      <input type="text" class="border w-full p-2 mb-4 rounded-md" placeholder="Apellido Materno"
+        oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('Ingrese su apellido materno ')"
+        required>
 
-      
+
       <div class="flex justify-between mb-4">
         <label class="inline-block "> Selecciona tu sexo: </label>
-        <select class= "border p-2  rounded-md" name="sexo" id="sexo-opciones">
+        <select class="border p-2  rounded-md" name="sexo" id="sexo-opciones" required>
           <option value="sexo-masculino">Masculino</option>
           <option value="sexo-femenino">Femenino</option>
           <option value="sexo-otro">Prefiero no responder</option>
         </select>
       </div>
-    
-
-      
-        <label class="block  mb-2 ">¿Eres padre/madre?</label>
-        <div class="flex gap-4 mb-4">
-          <label><input type="radio" name="papa" value="si" class="mr-2"> Sí</label>
-          <label><input type="radio" name="papa" value="no" class="mr-2"> No</label>
-        </div>
-      
-
-
-      
-        <label class= "block mb-2" for="cantidad-hijos">¿Cuantos hijos tienes? </label>
-        <input class= " border p-2 rounded-md max-h-min w-24 mb-4" type="number" id="cantidad-hijos" name="cantidad-hijos" min="1" max="10">
-      
-
 
       <div class="hidden border mb-4" id="pregunta-embarazo">
         <label class="block mb-2">¿Estas Embarazada?</label>
         <div class="flex gap-4 ">
-          <label><input type="radio" name="embarazo" value="si" class="mr-2"> Sí</label>
+          <label><input type="radio" name="embarazo" value="si" class="mr-2" id="radio-embarazo"> Sí</label>
           <label><input type="radio" name="embarazo" value="no" class="mr-2"> No</label>
         </div>
       </div>
 
+
+
+      <label class="block  mb-2 ">¿Eres padre/madre?</label>
+      <div class="flex gap-4 mb-4">
+        <label><input type="radio" name="papa" value="si" class="mr-2" id="padre" required> Sí</label>
+        <label><input type="radio" name="papa" value="no" class="mr-2"> No</label>
+      </div>
+
+
+      <div id="preguntahijos" class="hidden">
+        <label class="block mb-2" for="cantidad-hijos">¿Cuantos hijos tienes? </label>
+        <input class=" border p-2 rounded-md max-h-min w-24 mb-4" type="number" id="cantidad-hijos"
+          id="hijoscontador"name="cantidad-hijos" min="1" max="10" required>
+      </div>
+
+
+      <div id="espacioHijos">
+
+      </div>
+
+      
+
     </div>
-    
+
     <button type="submit" class="mb-3 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600">
       Siguiente
     </button>
-    
+
   </form>
 
   <script src="/js/formulario.js"></script>
 </body>
+
 </html>
