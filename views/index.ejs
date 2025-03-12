@@ -8,22 +8,53 @@
 </head>
 <body class="text-lg bg-gray-100 flex justify-center items-center min-h-screen">
   <form class="bg-white p-6 rounded-[30px] shadow-2xl max-w-md w-full">
-    <div class="-mr-6 -ml-6 -mt-6  mb-4 rounded-t-[30px] p-3 bg-emerald-700">
-        <h2 class=" text-3xl font-bold text-center text-white ">Información de los Trabajadores</h2>
-    </div>
-    <label class="block mb-2">Nombre(s)</label>
-    <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
-    <label class="block mb-2">Apellido Paterno</label>
-    <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
-    <label class="block mb-2">Apellido Materno</label>
-    <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
+    <div>
+      <div class="-mr-6 -ml-6 -mt-6  mb-4 rounded-t-[30px] p-3 bg-emerald-700">
+          <h2 class=" text-3xl font-bold text-center text-white ">Información de los Trabajadores</h2>
+      </div>
+
+      <label class="block mb-2 text-2xl font-bold text-black"> ¡Bienvenido! </label>
+      <label class="block mb-2">Nombre(s)</label>
+      <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
+      <label class="block mb-2">Apellido Paterno</label>
+      <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
+      <label class="block mb-2">Apellido Materno</label>
+      <input type="text" class="border w-full p-2 mb-4 rounded-md" required>
+
+      
+      <div class="flex justify-between mb-4">
+        <label class="inline-block "> Selecciona tu sexo: </label>
+        <select class= "border p-2  rounded-md" name="sexo" id="sexo-opciones">
+          <option value="sexo-masculino">Masculino</option>
+          <option value="sexo-femenino">Femenino</option>
+          <option value="sexo-otro">Prefiero no responder</option>
+        </select>
+      </div>
     
 
+      
+        <label class="block  mb-2 ">¿Eres padre/madre?</label>
+        <div class="flex gap-4 mb-4">
+          <label><input type="radio" name="papa" value="si" class="mr-2"> Sí</label>
+          <label><input type="radio" name="papa" value="no" class="mr-2"> No</label>
+        </div>
+      
 
-    <label class="block mb-2">¿Eres padre/madre?</label>
-    <div class="flex gap-4 mb-4">
-      <label><input type="radio" name="papa" value="si" class="mr-2"> Sí</label>
-      <label><input type="radio" name="papa" value="no" class="mr-2"> No</label>
+
+      
+        <label class= "block mb-2" for="cantidad-hijos">¿Cuantos hijos tienes? </label>
+        <input class= " border p-2 rounded-md max-h-min w-24 mb-4" type="number" id="cantidad-hijos" name="cantidad-hijos" min="1" max="10">
+      
+
+
+      <div class="hidden border mb-4" id="pregunta-embarazo">
+        <label class="block mb-2">¿Estas Embarazada?</label>
+        <div class="flex gap-4 ">
+          <label><input type="radio" name="embarazo" value="si" class="mr-2"> Sí</label>
+          <label><input type="radio" name="embarazo" value="no" class="mr-2"> No</label>
+        </div>
+      </div>
+
     </div>
     
     <button type="submit" class="mb-3 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600">
@@ -31,5 +62,7 @@
     </button>
     
   </form>
+
+  <script src="/js/formulario.js"></script>
 </body>
 </html>
