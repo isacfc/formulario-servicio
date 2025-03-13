@@ -6,7 +6,14 @@ const app = express(); //"Se crea la aplicación, app llama a express para utili
 
 
 const path = require('path'); //path es un modulo nativo de node.js para manejar rutas archivos
-
+const mysql = require('mysql2');
+/*
+const conexion = mysql.createConnection({
+  host: "localhost" ,
+  database: 'trabajadores_servicio',
+  user: 'root',
+  password: ''
+});*/
 
 app.set('view engine', 'ejs');  //view engine es una opcion especial, ejf es Embedded JavaScript
 // Ruta inicial para probar el servidor
@@ -22,8 +29,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 "__dirname es una variable especial de Node.js, "
 "la carpeta donde esta el archivo actual, se une a public"
 
+/*
+conexion.connect(function(error){
+  if(error){
+    console.log(error);
+  }
+  else{
+    console.log("Conexión exitosa");
+  }
+});
+
+conexion.end
+*/
+
+async function conectarDB() {
+  try {
+    const conexion = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'trabajadores_servicio'
+    });
+
+    console.log("Conexión exitosa a la base de datos");
+    return conexion;
+  } catch (error) {
+    console.error("Error de conexión:", error);
+  }
+}
 
 
+conectarDB();
 
 
 
