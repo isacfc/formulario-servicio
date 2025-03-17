@@ -6,7 +6,7 @@ const app = express(); //"Se crea la aplicación, app llama a express para utili
 
 
 const path = require('path'); //path es un modulo nativo de node.js para manejar rutas archivos
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 /*
 const conexion = mysql.createConnection({
   host: "localhost" ,
@@ -56,10 +56,29 @@ async function conectarDB() {
   } catch (error) {
     console.error("Error de conexión:", error);
   }
+
+  
 }
 
 
-conectarDB();
+async function obtenerTrabajadores() {
+  try {
+    const conexion = await conectarDB();
+    
+    const [rows] = await conexion.execute('SELECT * FROM trabajador');
+    
+    console.log("📋 Lista de trabajadores:", [rows]); // 🔍 Imprime los resultados
+
+    console.log(rows[0]);
+    
+    await conexion.end();
+  } catch (error) {
+    console.error("❌ Error al obtener trabajadores:", error);
+  }
+}
+
+
+
 
 
 
@@ -106,3 +125,7 @@ app.listen(3000, () => console.log('Servidor corriendo en http://localhost:3000'
 //npx tailwindcss -i ./public/css/tailwind.css -o ./public/css/styles.css --watch
 // .\ngrok.exe http 3000
 // node app.js
+
+
+
+obtenerTrabajadores();
