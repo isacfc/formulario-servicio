@@ -6,7 +6,6 @@ const app = express(); //"Se crea la aplicación, app llama a express para utili
 
 
 const path = require('path'); //path es un modulo nativo de node.js para manejar rutas archivos
-const mysql = require('mysql2/promise');
 /*
 const conexion = mysql.createConnection({
   host: "localhost" ,
@@ -41,25 +40,6 @@ conexion.connect(function(error){
 
 conexion.end
 */
-
-async function conectarDB() {
-  try {
-    const conexion = await mysql.createConnection({
-      host: 'localhost',
-      user: 'root',
-      password: '',
-      database: 'trabajadores_servicio'
-    });
-
-    console.log("Conexión exitosa a la base de datos");
-    return conexion;
-  } catch (error) {
-    console.error("Error de conexión:", error);
-  }
-
-  
-}
-
 
 async function obtenerTrabajadores() {
   try {
