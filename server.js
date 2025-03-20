@@ -44,6 +44,11 @@ app.get('/success', (req, res) => {
     res.render('success', { error: null });
 });
 
+
+app.get('/insert', (req, res) => {
+    res.render('insert', { error: null });
+});
+
 app.get('/', (req, res) => {
     res.redirect('/login');
 });
@@ -70,7 +75,7 @@ app.post('/guardar', async (req, res) => {
     const { sexo, papa, embarazo,  cantidadHijos } = req.body;
     const { idTrabajador } = req.session.user;
 
-    const query = 'UPDATE trabajador SET sexo = ?, es_padre_madre=? , embarazada=?, cantidadHijos = ? WHERE idTrabajador = ?';
+    const query = 'UPDATE trabajador SET sexoTrabajador = ?, es_padre_madre=? , embarazada=?, cantidadHijos = ? WHERE idTrabajador = ?';
 
     /*
     try {
@@ -96,6 +101,7 @@ app.post('/guardar', async (req, res) => {
                 // Extraemos cada dato dinámico. Asegúrate que en el form los inputs tengan nombres: 
                 // inicialesHijo0, fechaNacimientoHijo0, edadHijo0, etc.
                 const iniciales = req.body[`inicialesHijo${i}`];
+                const sexo = req.body[`selectHijo${i}`];
                 const fechaNacimiento = req.body[`fechaNacimientoHijo${i}`];
                 const edad = req.body[`edadHijo${i}`];
 
@@ -108,8 +114,8 @@ app.post('/guardar', async (req, res) => {
 
                 // Consulta para insertar cada hijo. Se asume que la tabla se llama "hijo" y tiene las columnas:
                 // id (auto-increment), idTrabajador, iniciales, fechaNacimiento y edad.
-                const queryChild = 'INSERT INTO hijo (iniciales, fechaNacimiento, edad, idTrabajador) VALUES (?, ?, ?, ?)';
-                const [childResult] = await db.query(queryChild, [iniciales, fechaFormateada, edad, idTrabajador]);
+                const queryChild = 'INSERT INTO hijo (inicialesHijo,sexoHijo, fechaNacimientoHijo, edadHijo, idTrabajador) VALUES (?, ?,?, ?, ?)';
+                const [childResult] = await db.query(queryChild, [iniciales,sexo, fechaFormateada, edad, idTrabajador]);
                 console.log(`✅ Hijo ${i + 1} guardado:`, childResult);
             }
         }
@@ -137,8 +143,12 @@ app.post('/login', async (req, res) => {
         console.log('Resultado de la consulta:', results);
 
         if (results.length === 0) {
-            console.log('⚠️ RFC no encontrado');
-            return res.render('login', { error: 'RFC no encontrado' });
+            return res.send(`
+                <script>
+                  alert('El RFC o el CURP no se han encontrado. Revise e intentelo de nuevo. SI el problema persiste, contacta al area de Recursos Humanos del Poder Judicial del Estado de Hidalgo');
+                  window.location.href = '/login'; // Redirige de nuevo al login
+                </script>
+              `);
         }
 
         console.log('✅ RFC encontrado:', results[0]);

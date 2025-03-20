@@ -209,6 +209,11 @@ document.addEventListener("DOMContentLoaded", function() {
             sexocombo.setCustomValidity("");
         }
 
+
+        if (!valido) {
+            event.preventDefault(); // Prevenimos el envío del formulario si la validación falla
+        }
+
         // VALIDACIÓN PARA SELECTS DINÁMICOS
         
       });
