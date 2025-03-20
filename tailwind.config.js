@@ -2,11 +2,16 @@
 module.exports = {
   content: [
     "./views/**/*.{html,ejs}",
-    "./public/**/*.html"
+    "./public/**/*.html",
+    "./js/**/*.js"
   ],
   theme: {
     extend: {colors:{verdegris: "#809484"},},
   },
+
+  safelist: [
+    "p-6", "m-2","m-6", "border", "rounded", "shadow-md", "bg-white", "border-gray-300","w-25","w-sm"],
+
   plugins: [],
 }
 
