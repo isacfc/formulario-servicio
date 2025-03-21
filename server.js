@@ -75,7 +75,28 @@ app.post('/guardar', async (req, res) => {
     const { sexo, papa, embarazo,  cantidadHijos } = req.body;
     const { idTrabajador } = req.session.user;
 
+    console.log("Papa: " + papa + " y " + sexo);
+    let padre;
+    let embarazada;
     const query = 'UPDATE trabajador SET sexoTrabajador = ?, es_padre_madre=? , embarazada=?, cantidadHijos = ? WHERE idTrabajador = ?';
+    if ( papa == 1 && sexo == "Femenino"){
+
+        padre="Madre";
+
+    } else if ( papa == 1 && sexo == "Masculino"){
+        padre="Padre";
+    }else{
+        padre="No";
+    }
+
+    if( embarazo == 1){
+        embarazada = "Embarazada";
+    }
+    else if (sexo == "Masculino"){
+        embarazada = "No aplica";
+    } else {
+        embarazada = "No";
+    }
 
     /*
     try {
@@ -91,7 +112,7 @@ app.post('/guardar', async (req, res) => {
     }*/
 
     try {
-        const [result] = await db.query(query, [sexo, papa, embarazo, cantidadHijos, idTrabajador]);
+        const [result] = await db.query(query, [sexo, padre, embarazada, cantidadHijos, idTrabajador]);
         console.log('✅ Actualización exitosa:', result);
 
         // Si se ingresaron datos de hijos, los insertamos
