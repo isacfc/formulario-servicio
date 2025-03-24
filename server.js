@@ -33,15 +33,13 @@ app.get('/login', (req, res) => {
 
 app.get('/index', (req, res) => {
     if (!req.session.user) {
-        // Si no ha iniciado sesión, lo mandamos al login
         return res.redirect('/login');
     }
-
     res.render('index', { user: req.session.user });
 });
 
 app.get('/success', (req, res) => {
-    res.render('success', { error: null });
+    res.render('success');
 });
 
 
@@ -51,6 +49,12 @@ app.get('/insert', (req, res) => {
 
 app.get('/', (req, res) => {
     res.redirect('/login');
+});
+
+app.get('/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.status(200).send('Sesión cerrada');
+    });
 });
 
 function convertirFecha(fechaDDMMYYYY) {
@@ -121,12 +125,14 @@ app.post('/guardar', async (req, res) => {
             for (let i = 0; i < cantidadHijos; i++) {
                 // Extraemos cada dato dinámico. Asegúrate que en el form los inputs tengan nombres: 
                 // inicialesHijo0, fechaNacimientoHijo0, edadHijo0, etc.
-                const iniciales = req.body[`inicialesHijo${i}`];
+                let iniciales = req.body[`inicialesHijo${i}`];
                 const sexo = req.body[`selectHijo${i}`];
                 const fechaNacimiento = req.body[`fechaNacimientoHijo${i}`];
                 const edad = req.body[`edadHijo${i}`];
 
-                
+                iniciales = iniciales.toUpperCase(); // Mayúsculas
+                iniciales = iniciales.replace(/[^A-Z]/g, ""); // Quitar todo excepto letras mayúsculas
+        
                 
                 const fechaFormateada = convertirFecha(fechaNacimiento);
 
@@ -141,7 +147,13 @@ app.post('/guardar', async (req, res) => {
             }
         }
 
-        res.redirect('/success');
+
+        // Destruir la sesión y redirigir
+        req.session.destroy(() => {
+            console.log("✅ Sesión destruida");
+            res.redirect('/success');
+        });
+
     } catch (err) {
         console.error('❌ Error al guardar:', err);
         res.send('Error al guardar');
@@ -152,8 +164,11 @@ app.post('/guardar', async (req, res) => {
 app.post('/login', async (req, res) => {
     console.log('🚀 Entró al POST /login');
 
-    const { rfc,curp } = req.body;
+    const rfc = req.body.rfc.toUpperCase();
+    const curp = req.body.curp.toUpperCase();
+
     console.log('RFC recibido:', rfc);
+
 
     try {
         console.log('🔍 Antes del query');
@@ -164,12 +179,15 @@ app.post('/login', async (req, res) => {
         console.log('Resultado de la consulta:', results);
 
         if (results.length === 0) {
+            console.log("Intento de sesión, no encontrado: " + rfc);
             return res.send(`
                 <script>
                   alert('El RFC o el CURP no se han encontrado. Revise e intentelo de nuevo. SI el problema persiste, contacta al area de Recursos Humanos del Poder Judicial del Estado de Hidalgo');
                   window.location.href = '/login'; // Redirige de nuevo al login
                 </script>
               `);
+
+            
         }
 
         console.log('✅ RFC encontrado:', results[0]);

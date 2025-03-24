@@ -40,6 +40,15 @@
   <footer class="w-full bg-verdegris text-white text-center py-4 mt-12">
     <p class="text-sm">© 2025 Poder Judicial del Estado de Hidalgo. Todos los derechos reservados.</p>
   </footer>
-
+  <script>
+    window.history.pushState(null, "", window.location.href);
+    window.onpopstate = function() {
+      // Destruye la sesión al darle "atrás"
+      fetch('/logout') // Ruta logout
+        .then(() => {
+          window.location.href = '/login';
+        });
+    };
+  </script>
 </body>
 </html>

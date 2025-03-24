@@ -75,58 +75,70 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     
-    function agregarCamposHijos(){
+    function agregarCamposHijos() {
         noHijos = hijoscontador.value;
         const espacioHijos = document.getElementById("espacioHijos");
-
+    
         while (espacioHijos.hasChildNodes()) {
             espacioHijos.removeChild(espacioHijos.lastChild);
         }
-
-        for (let i=0;i<noHijos;i++){
+    
+        for (let i = 0; i < noHijos; i++) {
             const divHijo = document.createElement("div");
-            divHijo.classList.add("mb-6", "p-4", "rounded");
-            // Create an <input> element, set its type and name attributes
-            var label = document.createElement("label");
+            divHijo.classList.add("mb-3", "p-4", "rounded", "border", "border-gray-300");
+    
+            // Título del hijo
+            const titulo = document.createElement("h3");
+            titulo.textContent = `Datos del Hijo ${i + 1}`;
+            titulo.classList.add("font-bold", "text-lg", "mb-4", "text-gray-800");
+            divHijo.appendChild(titulo);
+    
+            // Iniciales label
+            const labelIniciales = document.createElement("label");
+            labelIniciales.textContent = "Iniciales del Hijo (Sin puntos ni guiones. Ejemplo: JIFC):";
+            labelIniciales.classList.add("block", "font-medium", "mb-1", "text-gray-700");
+            divHijo.appendChild(labelIniciales);
 
-            label.textContent= "Hijo " + (i+1);
-
-            label.classList.add("mt-4");
             
-
-
-            var input = document.createElement("input");
+    
+            // Iniciales input
+            const input = document.createElement("input");
             input.type = "text";
             input.name = "inicialesHijo" + i;
-            input.placeholder = "Iniciales";
-            input.classList.add("border", "rounded-full", "bg-gray-50", "m-2","p-3");
+            input.placeholder = "Ejemplo: J.P.G.";
+            input.classList.add("border", "rounded-full", "bg-gray-50", "m-2", "p-3", "uppercase");
             input.setAttribute("required", "true");
-
-            var select = document.createElement("select");
+            divHijo.appendChild(input);
+    
+            // Sexo label
+            const labelSexo = document.createElement("label");
+            labelSexo.textContent = "Sexo del Hijo:";
+            labelSexo.classList.add("block", "font-medium", "mb-1", "text-gray-700", "mt-4");
+            divHijo.appendChild(labelSexo);
+    
+            // Sexo select
+            const select = document.createElement("select");
             select.name = "selectHijo" + i;
             select.classList.add("border", "rounded-full", "bg-gray-50", "m-2", "p-3");
             select.setAttribute("required", "true");
-
-            // Opciones
-            var opcion1 = document.createElement("option");
+    
+            const opcion1 = document.createElement("option");
             opcion1.value = "Seleccione";
             opcion1.textContent = "Seleccione el sexo";
             select.appendChild(opcion1);
-
-            var opcion2 = document.createElement("option");
+    
+            const opcion2 = document.createElement("option");
             opcion2.value = "Masculino";
             opcion2.textContent = "Masculino";
             select.appendChild(opcion2);
-
-            var opcion3 = document.createElement("option");
+    
+            const opcion3 = document.createElement("option");
             opcion3.value = "Femenino";
             opcion3.textContent = "Femenino";
             select.appendChild(opcion3);
-
-            // ⏺️ Validación inicial (por defecto inválido)
+    
             select.setCustomValidity("Seleccione una opción");
-
-            // ⏺️ Listener en cada select dinámico
+    
             select.addEventListener("change", function() {
                 if (select.value !== "Seleccione") {
                     select.setCustomValidity("");
@@ -135,55 +147,50 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
                 select.reportValidity();
             });
-            // Finalmente, agregar  
-            
-
-
-            var input2 = document.createElement("input");
+            divHijo.appendChild(select);
+    
+            // Fecha nacimiento label
+            const labelFecha = document.createElement("label");
+            labelFecha.textContent = "Fecha de nacimiento del hijo:";
+            labelFecha.classList.add("block", "font-medium", "mb-1", "text-gray-700", "mt-4");
+            divHijo.appendChild(labelFecha);
+    
+            // Fecha nacimiento input
+            const input2 = document.createElement("input");
             input2.type = "text";
             input2.name = "fechaNacimientoHijo" + i;
-            input2.placeholder = "Fecha de nacimiento";
-            input2.classList.add("border", "rounded-full", "bg-gray-50", "m-2","p-3","datepicker");
+            input2.placeholder = "dd-mm-yyyy";
+            input2.classList.add("border", "rounded-full", "bg-gray-50", "m-2", "p-3", "datepicker");
             input2.setAttribute("required", "true");
             Inputmask("99-99-9999", { placeholder: "dd-mm-yyyy" }).mask(input2);
-
-            var input3 = document.createElement("input");
+            divHijo.appendChild(input2);
+    
+            // Edad label
+            const labelEdad = document.createElement("label");
+            labelEdad.textContent = "Edad actual del hijo en años (Ejemplo: 5):";
+            labelEdad.classList.add("block", "font-medium", "mb-1", "text-gray-700", "mt-4");
+            divHijo.appendChild(labelEdad);
+    
+            // Edad input
+            const input3 = document.createElement("input");
             input3.type = "number";
             input3.name = "edadHijo" + i;
-            input3.placeholder = "Edad (años) a la fecha";
-            input3.classList.add("border", "rounded-full", "bg-gray-50", "m-2","p-3");
+            input3.placeholder = "Ejemplo: 5";
+            input3.classList.add("border", "rounded-full", "bg-gray-50", "m-2", "p-3");
             input3.setAttribute("required", "true");
-
-            
-            espacioHijos.appendChild(label);
-            divHijo.appendChild(input);
-            divHijo.appendChild(select);
-
-            selectEventListener();
-
-            divHijo.appendChild(input2);
             divHijo.appendChild(input3);
-            espacioHijos.appendChild(document.createElement("br"));
+    
             espacioHijos.appendChild(divHijo);
-            // Append a line break
-            espacioHijos.appendChild(document.createElement("br"));
-
-            var dateInputs = document.querySelectorAll('.datepicker');
-            for (let j = 0; j < dateInputs.length; j++) {
-            var input = dateInputs[j];
-            // Verifica si ya se ha inicializado Flatpickr en este input
-            if (!input._flatpickr) {
-                flatpickr(input, {
+    
+            // Flatpickr para fechas
+            flatpickr(input2, {
                 dateFormat: "d-m-Y",
                 allowInput: true
-                });
-            }
-            }
-
-
-         }
-
-         
+            });
+    
+            // Listener select
+            selectEventListener();
+        }
     }
 
     sexocombo.addEventListener("change", function() {

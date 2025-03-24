@@ -10,7 +10,7 @@ module.exports = {
   },
 
   safelist: [
-    "p-6", "m-2","m-6", "border", "rounded", "shadow-md", "bg-white", "border-gray-300","w-25","w-sm"],
+    "p-6", "m-2","m-6", "mb-3", "border", "rounded", "shadow-md", "bg-white", "border-gray-300","w-25","w-sm"],
 
   plugins: [],
 }
