@@ -76,13 +76,19 @@ app.post('/guardar', async (req, res) => {
    
     
 
-    const { sexo, papa, embarazo,  cantidadHijos } = req.body;
+    const { telefono, sexo,codigopostal,correo, papa, embarazo,  cantidadHijos } = req.body;
     const { idTrabajador } = req.session.user;
+
+    const callenumero = req.body.callenumero.toUpperCase();
+    const colonia = req.body.colonia.toUpperCase();
+    const municipio = req.body.municipio.toUpperCase();
+    const estado = req.body.estado.toUpperCase();
+    
 
     console.log("Papa: " + papa + " y " + sexo);
     let padre;
     let embarazada;
-    const query = 'UPDATE trabajador SET sexoTrabajador = ?, es_padre_madre=? , embarazada=?, cantidadHijos = ? WHERE idTrabajador = ?';
+    const query = 'UPDATE trabajador SET  sexoTrabajador = ?,calleNumero=?,colonia=?,municipio=?,estado=?,codigoPostal=?,  noTelefono = ?, correoElectronico=?, es_padre_madre=? , embarazada = ?, cantidadHijos = ? WHERE idTrabajador = ?';
     if ( papa == 1 && sexo == "Femenino"){
 
         padre="Madre";
@@ -93,7 +99,7 @@ app.post('/guardar', async (req, res) => {
         padre="No";
     }
 
-    if( embarazo == 1){
+    if( embarazo == 1 && sexo == "Femenino"){
         embarazada = "Embarazada";
     }
     else if (sexo == "Masculino"){
@@ -116,7 +122,7 @@ app.post('/guardar', async (req, res) => {
     }*/
 
     try {
-        const [result] = await db.query(query, [sexo, padre, embarazada, cantidadHijos, idTrabajador]);
+        const [result] = await db.query(query, [sexo,callenumero,colonia,municipio,estado,codigopostal,telefono,correo, padre, embarazada, cantidadHijos, idTrabajador]);
         console.log('✅ Actualización exitosa:', result);
 
         // Si se ingresaron datos de hijos, los insertamos

@@ -1,14 +1,14 @@
 document.addEventListener("DOMContentLoaded", function() {
     
     console.log("El DOM se ha cargado");
-    const sexocombo = document.getElementById("sexo-opciones")
+    const sexocombo = document.getElementById("sexo-opciones");
     const botonFormulario = document.getElementById("botonFormulario");
     
 
 
 
-    const radioembarazo = document.getElementById("radio-embarazo")
-    const hijoscontador = document.getElementById("hijoscontador")
+    const radioembarazo = document.getElementById("radio-embarazo");
+    const hijoscontador = document.getElementById("hijoscontador");
 
 
     const preguntaEmbarazo = document.getElementById("pregunta-embarazo");
@@ -95,24 +95,22 @@ document.addEventListener("DOMContentLoaded", function() {
     
             // Iniciales label
             const labelIniciales = document.createElement("label");
-            labelIniciales.textContent = "Iniciales del Hijo (Sin puntos ni guiones. Ejemplo: JIFC):";
+            labelIniciales.textContent = "Iniciales de la hija o hijo (Ejemplo: JIFC):";
             labelIniciales.classList.add("block", "font-medium", "mb-1", "text-gray-700");
             divHijo.appendChild(labelIniciales);
-
-            
     
             // Iniciales input
             const input = document.createElement("input");
             input.type = "text";
             input.name = "inicialesHijo" + i;
-            input.placeholder = "Ejemplo: J.P.G.";
+            input.placeholder = "Ejemplo: JPG";
             input.classList.add("border", "rounded-full", "bg-gray-50", "m-2", "p-3", "uppercase");
             input.setAttribute("required", "true");
             divHijo.appendChild(input);
     
             // Sexo label
             const labelSexo = document.createElement("label");
-            labelSexo.textContent = "Sexo del Hijo:";
+            labelSexo.textContent = "Sexo de la hija o hijo:";
             labelSexo.classList.add("block", "font-medium", "mb-1", "text-gray-700", "mt-4");
             divHijo.appendChild(labelSexo);
     
@@ -137,13 +135,13 @@ document.addEventListener("DOMContentLoaded", function() {
             opcion3.textContent = "Femenino";
             select.appendChild(opcion3);
     
-            select.setCustomValidity("Seleccione una opción");
+            select.setCustomValidity("Seleccione el sexo del hijo");
     
             select.addEventListener("change", function() {
                 if (select.value !== "Seleccione") {
                     select.setCustomValidity("");
                 } else {
-                    select.setCustomValidity("Seleccione una opción");
+                    select.setCustomValidity("Seleccione el sexo del hijo");
                 }
                 select.reportValidity();
             });
@@ -151,7 +149,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
             // Fecha nacimiento label
             const labelFecha = document.createElement("label");
-            labelFecha.textContent = "Fecha de nacimiento del hijo:";
+            labelFecha.textContent = "Fecha de nacimiento de la hija o hijo:";
             labelFecha.classList.add("block", "font-medium", "mb-1", "text-gray-700", "mt-4");
             divHijo.appendChild(labelFecha);
     
@@ -167,7 +165,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
             // Edad label
             const labelEdad = document.createElement("label");
-            labelEdad.textContent = "Edad actual del hijo en años (Ejemplo: 5):";
+            labelEdad.textContent = "Edad actual de la hija o hijo en años (Ejemplo: 5):";
             labelEdad.classList.add("block", "font-medium", "mb-1", "text-gray-700", "mt-4");
             divHijo.appendChild(labelEdad);
     
@@ -204,10 +202,18 @@ document.addEventListener("DOMContentLoaded", function() {
    
     
 
-    form.addEventListener("submit", function(event) {
-        let valido = true; // Para verificar si todos los selects son válidos
+      form.addEventListener("submit", function(event) {
+        let valido = true;
+        const telefonoInput = document.getElementById('noTelefono');
+        const postalInput = document.getElementById('postal');
+        const errorMessage = document.getElementById('error-message');
+        const errorMessage2 = document.getElementById('error-message2');
     
-        // Validamos el sexo como ya lo tenías
+        // Resetear mensajes de error
+        errorMessage.style.display = 'none';
+        errorMessage2.style.display = 'none';
+    
+        // Validación de sexo
         if (sexocombo.value === "Seleccione") {
             sexocombo.setCustomValidity("Rellene correctamente: seleccione una opción");
             sexocombo.reportValidity();
@@ -215,15 +221,30 @@ document.addEventListener("DOMContentLoaded", function() {
         } else {
             sexocombo.setCustomValidity("");
         }
-
-
-        if (!valido) {
-            event.preventDefault(); // Prevenimos el envío del formulario si la validación falla
+    
+        // Validación de teléfono (corregido isNaN)
+        const telefono = telefonoInput.value;
+        if (telefono.length !== 10 || isNaN(telefono)) {
+            errorMessage.style.display = 'inline';
+            valido = false;
         }
-
-        // VALIDACIÓN PARA SELECTS DINÁMICOS
-        
-      });
+    
+        // Validación de código postal (mejor usar input text)
+        const codigoPostal = postalInput.value;
+        if (codigoPostal.length !== 5 || isNaN(codigoPostal)) {
+            errorMessage2.style.display = 'inline';
+            valido = false;
+        }
+    
+        // Si alguna validación falla, prevenir envío
+        if (!valido) {
+            event.preventDefault();
+            // Opcional: enfocar primer campo con error
+            if (sexocombo.value === "Seleccione") sexocombo.focus();
+            else if (errorMessage.style.display === 'inline') telefonoInput.focus();
+            else postalInput.focus();
+        }
+    });
 
     
    
