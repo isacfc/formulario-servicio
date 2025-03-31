@@ -3,6 +3,8 @@ document.addEventListener("DOMContentLoaded", function() {
     console.log("El DOM se ha cargado");
     const sexocombo = document.getElementById("sexo-opciones");
     const botonFormulario = document.getElementById("botonFormulario");
+
+    const camposAcentos = document.querySelectorAll(".acentos");
     
 
 
@@ -260,6 +262,29 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     hijoscontador.addEventListener("input", agregarCamposHijos);
+
+    function reemplazarAcentos(campo){
+        campo.addEventListener('input', function () {
+            //eliminar  losacentos
+            //.value = this.value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+            let valor = campo.value
+            .replace(/ñ/gi, 'ñ') // Mantener ñ existentes
+            .normalize("NFD")
+            // Convertir n + tilde a ñ (después de normalizar)
+            .replace(/\u006E\u0303/gi, 'ñ')
+            // Eliminar otros diacríticos
+            .replace(/[\u0300-\u036f]/g, "")
+            // Permitir ñ/Ñ en el filtro
+            .replace(/[^a-zA-Z0-9ñÑ\s\.]/g, "")
+            .replace(/^\s+/, "")
+            .replace(/\s{2,}/g, " ");
+            
+            campo.value = valor.toUpperCase();
+          });
+    }
+
+    camposAcentos.forEach(reemplazarAcentos);
 
 
 });
