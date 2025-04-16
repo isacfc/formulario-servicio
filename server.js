@@ -125,6 +125,11 @@ app.post('/guardar', async (req, res) => {
         const [result] = await db.query(query, [sexo,callenumero,colonia,municipio,estado,codigopostal,telefono,correo, padre, embarazada, cantidadHijos, idTrabajador]);
         console.log('✅ Actualización exitosa:', result);
 
+
+        const deleteQuery = 'DELETE FROM hijo WHERE idTrabajador = ?';
+        await db.query(deleteQuery, [idTrabajador]);
+        console.log(`🗑️ Hijos anteriores eliminados para trabajador ${idTrabajador}`);
+
         // Si se ingresaron datos de hijos, los insertamos
         if (cantidadHijos && cantidadHijos > 0) {
             // (Opcional: podrías borrar registros anteriores de hijos para ese trabajador, si se requiere)
