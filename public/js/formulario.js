@@ -2,24 +2,29 @@ document.addEventListener("DOMContentLoaded", function() {
     
     console.log("El DOM se ha cargado");
     const sexocombo = document.getElementById("sexo-opciones");
+    const sexoconyugecombo = document.getElementById("sexoConyuge-opciones");
+    const civilcombo = document.getElementById("civil-opciones");
+    const sangrecombo = document.getElementById("sangre-opciones");
     const botonFormulario = document.getElementById("botonFormulario");
 
     const camposAcentos = document.querySelectorAll(".acentos");
-    
+    const inputsFecha = document.querySelectorAll("input[data-format='dd-mm-yyyy']");
 
 
-
-    const radioembarazo = document.getElementById("radio-embarazo");
+    const radioscronica = document.getElementsByName("cronica");
     const hijoscontador = document.getElementById("hijoscontador");
 
 
     const preguntaEmbarazo = document.getElementById("pregunta-embarazo");
     const preguntaHijos = document.getElementById("preguntahijos");
+    
 
     var radiospapa = document.getElementsByName("papa");
     var form = document.querySelector("form");
 
-  
+    const fechaConyuge = document.getElementById("fechaConyuge");
+
+    
     function actualizarPreguntaEmbarazo() {
 
         const sexo = sexocombo.value
@@ -37,6 +42,49 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log("se ha quitado el required")
         }
     }
+
+
+    function actualizarPreguntaConyuge() {
+        const estadoCivil = document.getElementById("civil-opciones").value;
+        const datosConyuge = document.getElementById("datosConyuge");
+        const camposConyuge = document.getElementsByClassName("conyuge");
+
+        console.log(estadoCivil);
+
+        if (estadoCivil === "Casado/a"){
+            datosConyuge.classList.remove("hidden");
+            for (let i = 0; i < camposConyuge.length; i++) {
+                camposConyuge[i].required = true;
+              }
+        }
+        else{
+            datosConyuge.classList.add("hidden");
+            for (let i = 0; i < camposConyuge.length; i++) {
+                camposConyuge[i].required = false;
+              }
+
+        }
+        
+        
+    }
+
+    function actualizarPreguntaCronica() {
+        const preguntaCronica = document.getElementById("preguntaCronica");
+        const textoCronica = document.getElementById("cronica-texto");
+        if (radioscronica[0].checked) {
+            preguntaCronica.classList.remove("hidden");
+            textoCronica.setAttribute("required","true");
+            
+        } else {
+            preguntaCronica.classList.add("hidden");
+            textoCronica.removeAttribute("required");
+            
+                
+            
+        }
+
+    }
+
 
     function actualizarPreguntaHijos() {
 
@@ -201,6 +249,38 @@ document.addEventListener("DOMContentLoaded", function() {
         }
       });
 
+    civilcombo.addEventListener("change", function() {
+        if (civilcombo.value !== "Seleccione") {
+            civilcombo.setCustomValidity("");
+
+        
+        } else {
+            civilcombo.setCustomValidity("Rellene correctamente: seleccione un estado civil");
+        }
+
+        if (civilcombo.value === "Casado/a"){
+            sexoconyugecombo.addEventListener("change", function() {
+                if (sexoconyugecombo.value !== "Seleccione") {
+                  sexoconyugecombo.setCustomValidity("");
+                } else {
+                  sexoconyugecombo.setCustomValidity("Rellene correctamente: seleccione una opción");
+                }
+              });
+        }
+    });
+
+    sangrecombo.addEventListener("change", function() {
+        if (sangrecombo.value !== "Seleccione") {
+            sangrecombo.setCustomValidity("");
+        } else {
+            sangrecombo.setCustomValidity("Rellene correctamente: seleccione una opción");
+        }
+    });
+
+
+
+
+
    
     
 
@@ -214,7 +294,27 @@ document.addEventListener("DOMContentLoaded", function() {
         // Resetear mensajes de error
         errorMessage.style.display = 'none';
         errorMessage2.style.display = 'none';
-    
+        
+
+        for (let i = 1; i <= 3; i++) {
+            const titulo = document.querySelector(`[name="licenciatura_titulo${i}"]`);
+            const fecha = document.querySelector(`[name="licenciatura_fecha${i}"]`);
+            const inst = document.querySelector(`[name="licenciatura_institucion${i}"]`);
+
+            if (!titulo || !fecha || !inst) continue;
+
+            const hayAlgunDato = titulo.value.trim() || fecha.value.trim() || inst.value.trim();
+
+            if (hayAlgunDato && (!titulo.value.trim() || !fecha.value.trim() || !inst.value.trim())) {
+            alert(`⚠️ Completa todos los campos de la Licenciatura ${i} o deja todos vacíos.`);
+            if (!titulo.value.trim()) titulo.focus();
+            else if (!fecha.value.trim()) fecha.focus();
+            else inst.focus();
+            e.preventDefault();
+            valido = false;
+            break;
+            }
+        }
         // Validación de sexo
         if (sexocombo.value === "Seleccione") {
             sexocombo.setCustomValidity("Rellene correctamente: seleccione una opción");
@@ -223,6 +323,38 @@ document.addEventListener("DOMContentLoaded", function() {
         } else {
             sexocombo.setCustomValidity("");
         }
+
+        if (civilcombo.value === "Seleccione") {
+            civilcombo.setCustomValidity("Rellene correctamente: seleccione una opción");
+            civilcombo.reportValidity();
+            valido = false;
+        }else if (civilcombo.value === "Casado/a") {
+            civilcombo.setCustomValidity("");
+        
+            if (sexoconyugecombo.value === "Seleccione") {
+                sexoconyugecombo.setCustomValidity("Rellene correctamente: seleccione una opción");
+                sexoconyugecombo.reportValidity();
+                valido = false;
+            } else {
+                sexoconyugecombo.setCustomValidity("");
+            }
+        
+
+        
+        } else {
+            civilcombo.setCustomValidity("");
+            sexoconyugecombo.setCustomValidity("");
+        }
+
+        if (sangrecombo.value === "Seleccione") {
+            sangrecombo.setCustomValidity("Rellene correctamente: seleccione una opción");
+            sangrecombo.reportValidity();
+            valido = false;
+        } else {
+            sangrecombo.setCustomValidity("");
+        }
+
+       
     
         // Validación de teléfono (corregido isNaN)
         const telefono = telefonoInput.value;
@@ -237,12 +369,21 @@ document.addEventListener("DOMContentLoaded", function() {
             errorMessage2.style.display = 'inline';
             valido = false;
         }
+
+        if (!validarEscolaridad("licenciatura", 3, "Licenciatura")) valido = false;
+        if (!validarEscolaridad("maestria", 3, "Maestría")) valido = false;
+        if (!validarEscolaridad("especialidad", 3, "Especialidad")) valido = false;
+        if (!validarEscolaridad("doctorado", 2, "Doctorado")) valido = false;
+
     
         // Si alguna validación falla, prevenir envío
         if (!valido) {
             event.preventDefault();
             // Opcional: enfocar primer campo con error
             if (sexocombo.value === "Seleccione") sexocombo.focus();
+            else if (civilcombo.value === "Seleccione") civilcombo.focus();
+            else if (civilcombo.value=== "Casado/a" && sexoconyugecombo.value === "Seleccione") sexoconyugecombo.focus();
+            else if (sangrecombo.value === "Seleccione") civilcombo.focus();
             else if (errorMessage.style.display === 'inline') telefonoInput.focus();
             else postalInput.focus();
         }
@@ -256,35 +397,336 @@ document.addEventListener("DOMContentLoaded", function() {
     
 
     sexocombo.addEventListener("change", actualizarPreguntaEmbarazo);
-
+    civilcombo.addEventListener("change", actualizarPreguntaConyuge);
     radiospapa.forEach(radio => {
         radio.addEventListener("change", actualizarPreguntaHijos);
     });
 
+    radioscronica.forEach(radio => {
+        radio.addEventListener("change", actualizarPreguntaCronica);
+    });
+
     hijoscontador.addEventListener("input", agregarCamposHijos);
+    Inputmask("99-99-9999", { placeholder: "dd-mm-yyyy" }).mask(fechaConyuge);
+    flatpickr(fechaConyuge, {
+        dateFormat: "d-m-Y",
+        allowInput: true
+    });
 
-    function reemplazarAcentos(campo){
-        campo.addEventListener('input', function () {
-            //eliminar  losacentos
-            //.value = this.value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    inputsFecha.forEach(function(input) {
+        // Flatpickr
+        flatpickr(input, {
+            dateFormat: "d-m-Y",
+            allowInput: true
+        });
+    
+        // Inputmask
+        Inputmask("99-99-9999", { placeholder: "dd-mm-yyyy" }).mask(input);
+    });
 
-            let valor = campo.value
-            .replace(/ñ/gi, 'ñ') // Mantener ñ existentes
-            .normalize("NFD")
-            // Convertir n + tilde a ñ (después de normalizar)
-            .replace(/\u006E\u0303/gi, 'ñ')
-            // Eliminar otros diacríticos
-            .replace(/[\u0300-\u036f]/g, "")
-            // Permitir ñ/Ñ en el filtro
-            .replace(/[^a-zA-Z0-9ñÑ\s\.]/g, "")
-            .replace(/^\s+/, "")
-            .replace(/\s{2,}/g, " ");
-            
-            campo.value = valor.toUpperCase();
-          });
-    }
+    document.querySelectorAll("input[data-format='mm-yyyy']").forEach(function(input) {
+        flatpickr(input, {
+          plugins: [
+            new monthSelectPlugin({
+              shorthand: false,
+              dateFormat: "m-Y",   // <-- Cómo se guarda
+              altFormat: "F Y",    // <-- Cómo se muestra (opcional)
+              theme: "light",
+              allowInput: true
+            })
+          ],
+          allowInput: true
+        });
+      
+        // Inputmask para mm-yyyy
+        Inputmask("99-9999", { placeholder: "mm-yyyy" }).mask(input);
+      });
+      
 
     camposAcentos.forEach(reemplazarAcentos);
 
 
 });
+
+
+function reemplazarAcentos(campo){
+        
+    campo.addEventListener('input', function () {
+        //eliminar  losacentos
+        //.value = this.value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        let valor = campo.value
+        .replace(/ñ/gi, 'ñ') // Mantener ñ existentes
+        .normalize("NFD")
+        // Convertir n + tilde a ñ (después de normalizar)
+        .replace(/\u006E\u0303/gi, 'ñ')
+        // Eliminar otros diacríticos
+        .replace(/[\u0300-\u036f]/g, "")
+        // Permitir ñ/Ñ en el filtro
+        .replace(/[^a-zA-Z0-9ñÑ\s\.]/g, "")
+        .replace(/^\s+/, "")
+        .replace(/\s{2,}/g, " ");
+        
+        campo.value = valor.toUpperCase();
+      });
+}
+
+
+
+let experienciaIndex = 0;
+
+function agregarExperiencia() {
+    
+const container = document.getElementById("espacioExperiencia");
+
+const div = document.createElement("div");
+div.classList.add("mb-3", "p-4", "rounded", "border", "border-gray-300");
+
+div.innerHTML = `
+<label class="block text-gray-700 font-semibold">Periodo: Mes/Año de inicio</label>
+<input type="text" name="experiencia_inicio${experienciaIndex}" data-format="mm-yyyy" required class="border w-full p-2 rounded-md bg-gray-50 mb-2" placeholder="MM-AAAA">
+
+<label class="block text-gray-700 font-semibold"> Periodo: Mes/Año de fin</label>
+<input type="month" name="experiencia_fin${experienciaIndex}" data-format="mm-yyyy" required class="border w-full p-2 rounded-md bg-gray-50"  placeholder="MM-AAAA">
+
+<label class="block text-gray-700 font-semibold">Institución</label>
+  <select name="experiencia_institucion${experienciaIndex}"
+          class="border w-full p-2 rounded-md bg-gray-50 mb-2">
+    <option value="PJ">Poder Judicial del Estado de Hidalgo</option>
+    <option value="OTRA">Otra</option>
+  </select>
+
+  <div id="adscripcion-container-${experienciaIndex}" class="mb-2">
+    <label class="block text-gray-700 font-semibold">Adscripción</label>
+    <input type="text" name="experiencia_adscripcion${experienciaIndex}"
+           placeholder="EJ. PRIMERA SALA CIVIL Y FAMILIAR"
+           class="acentos border w-full p-2 rounded-md bg-gray-50">
+  </div>
+
+  <div id="otra-inst-container-${experienciaIndex}" class="hidden mb-2">
+    <label class="block text-gray-700 font-semibold">Nombre de la institución</label>
+    <input type="text" name="experiencia_otrainst${experienciaIndex}"
+           placeholder="EJ. BANCO AZTECA, S.A."
+           class="acentos border w-full p-2 rounded-md bg-gray-50">
+  </div>
+
+<label class="block text-gray-700 font-semibold">Cargo ó Puesto desempeñado</label>
+<input type="text" name="experiencia_puesto${experienciaIndex}" placeholder="Ej. SECRETARIA DE ESTUDIO Y CUENTA" required class="acentos border w-full p-2 rounded-md bg-gray-50 mb-2">
+
+<label class="block text-gray-700 font-semibold">Campo de experiencia</label>
+<input type="text" name="experiencia_campo${experienciaIndex}" placeholder="Ej. ELABORACION DE PROYECTOS DE SENTENCIA DE SEGUNDA INSTANCIA" required class="acentos border w-full p-2 rounded-md bg-gray-50 mb-2">
+
+
+`;
+if(experienciaIndex < 10){
+
+    container.appendChild(div);
+
+
+    
+   
+
+    // dentro de agregarExperiencia(), justo tras appendChild(div):
+    const selectInst = div.querySelector(
+        `select[name="experiencia_institucion${experienciaIndex}"]`
+    );
+    const adscripContainer = div.querySelector(
+        `#adscripcion-container-${experienciaIndex}`
+    );
+    const otraContainer = div.querySelector(
+        `#otra-inst-container-${experienciaIndex}`
+    );
+    function toggleCampos(e) {
+        if (e.target.value === 'PJ') {
+          adscripContainer.classList.remove('hidden');
+          otraContainer.classList.add('hidden');
+        } else {
+          adscripContainer.classList.add('hidden');
+          otraContainer.classList.remove('hidden');
+        }
+      }
+      
+      // Inicializa según el valor por defecto
+      toggleCampos({ target: selectInst });
+      
+      // Escucha cambios
+      selectInst.addEventListener('change', toggleCampos);
+      
+
+      experienciaIndex++;
+      document.getElementById('experienciaTotal').value = experienciaIndex;
+}
+
+
+
+    document.querySelectorAll("input[data-format='mm-yyyy']").forEach(function(input) {
+        flatpickr(input, {
+        plugins: [
+            new monthSelectPlugin({
+            shorthand: false,
+            dateFormat: "m-Y",   // <-- Cómo se guarda
+            altFormat: "F Y",    // <-- Cómo se muestra (opcional)
+            theme: "light",
+            allowInput: true
+            })
+        ],
+        allowInput: true
+        });
+    
+        // Inputmask para mm-yyyy
+        Inputmask("99-9999", { placeholder: "mm-yyyy" }).mask(input);
+    });
+
+    const camposAcentos = document.querySelectorAll(".acentos");
+    camposAcentos.forEach(reemplazarAcentos);
+
+
+}
+
+
+function quitarExperiencia() {
+    const container = document.getElementById("espacioExperiencia");
+    container.removeChild(container.lastChild);
+    experienciaIndex = Math.max(0, experienciaIndex - 1);
+    document.getElementById('experienciaTotal').value = experienciaIndex;
+
+
+
+}
+
+
+let licVisible = 1;
+
+document.getElementById("mostrarMasLicenciaturas").addEventListener("click", () => {
+  licVisible++;
+  if (licVisible <= 3) {
+    document.getElementById(`lic${licVisible}`).classList.remove("hidden");
+
+    // aplicar flatpickr + inputmask
+    flatpickr(
+      document.querySelector(`[name="licenciatura_fecha${licVisible}"]`), {
+        plugins: [new monthSelectPlugin({ dateFormat: "m-Y", altFormat: "F Y" })],
+        allowInput: true
+      }
+    );
+
+    Inputmask("99-9999", { placeholder: "mm-yyyy" }).mask(
+      document.querySelector(`[name="licenciatura_fecha${licVisible}"]`)
+    );
+  }
+
+  if (licVisible === 3) {
+    document.getElementById("mostrarMasLicenciaturas").disabled = true;
+    document.getElementById("mostrarMasLicenciaturas").textContent = "Límite de licenciatura alcanzado";
+  }
+});
+
+let maeVisible = 1;
+document.getElementById("mostrarMasMaestrias").addEventListener("click", () => {
+  maeVisible++;
+  if (maeVisible <= 3) {
+    document.getElementById(`mae${maeVisible}`).classList.remove("hidden");
+
+    // aplicar flatpickr + inputmask
+    flatpickr(
+      document.querySelector(`[name="maestria_fecha${maeVisible}"]`), {
+        plugins: [new monthSelectPlugin({ dateFormat: "m-Y", altFormat: "F Y" })],
+        allowInput: true
+      }
+    );
+
+    Inputmask("99-9999", { placeholder: "mm-yyyy" }).mask(
+      document.querySelector(`[name="maestria_fecha${maeVisible}"]`)
+    );
+  }
+  
+
+  if (maeVisible === 3) {
+    document.getElementById("mostrarMasMaestrias").disabled = true;
+    document.getElementById("mostrarMasMaestrias").textContent = "Límite de maestrias alcanzado";
+  }
+});
+
+
+let espVisible = 1;
+document.getElementById("mostrarMasEspecialidades").addEventListener("click", () => {
+  espVisible++;
+  if (espVisible <= 3) {
+    document.getElementById(`esp${espVisible}`).classList.remove("hidden");
+
+    // aplicar flatpickr + inputmask
+    flatpickr(
+      document.querySelector(`[name="especialidad_fecha${espVisible}"]`), {
+        plugins: [new monthSelectPlugin({ dateFormat: "m-Y", altFormat: "F Y" })],
+        allowInput: true
+      }
+    );
+
+    Inputmask("99-9999", { placeholder: "mm-yyyy" }).mask(
+      document.querySelector(`[name="especialidad_fecha${espVisible}"]`)
+    );
+  }
+  
+
+  if (espVisible === 3) {
+    document.getElementById("mostrarMasEspecialidades").disabled = true;
+    document.getElementById("mostrarMasEspecialidades").textContent = "Límite de especialidades alcanzado";
+  }
+});
+
+
+
+
+let docVisible = 1;
+document.getElementById("mostrarMasDoctorados").addEventListener("click", () => {
+  docVisible++;
+  if (docVisible <= 2) {
+    document.getElementById(`doc${docVisible}`).classList.remove("hidden");
+
+    // aplicar flatpickr + inputmask
+    flatpickr(
+      document.querySelector(`[name="doctorado_fecha${docVisible}"]`), {
+        plugins: [new monthSelectPlugin({ dateFormat: "m-Y", altFormat: "F Y" })],
+        allowInput: true
+      }
+    );
+
+    Inputmask("99-9999", { placeholder: "mm-yyyy" }).mask(
+      document.querySelector(`[name="doctorado_fecha${docVisible}"]`)
+    );
+  }
+  
+
+  if (docVisible === 2) {
+    document.getElementById("mostrarMasDoctorados").disabled = true;
+    document.getElementById("mostrarMasDoctorados").textContent = "Límite de doctorados alcanzado";
+  }
+});
+
+
+
+
+function validarEscolaridad(prefix, cantidadMaxima, nombreVisible) {
+  for (let i = 1; i <= cantidadMaxima; i++) {
+    const titulo = document.querySelector(`[name="${prefix}_titulo${i}"]`);
+    const fecha = document.querySelector(`[name="${prefix}_fecha${i}"]`);
+    const inst = document.querySelector(`[name="${prefix}_institucion${i}"]`);
+
+    if (!titulo || !fecha || !inst) continue;
+
+    const hayAlgo = titulo.value.trim() || fecha.value.trim() || inst.value.trim();
+    const incompleto = !titulo.value.trim() || !fecha.value.trim() || !inst.value.trim();
+
+    if (hayAlgo && incompleto) {
+      alert(`⚠️ Completa todos los campos de ${nombreVisible} ${i} o deja todos vacíos.`);
+      if (!titulo.value.trim()) titulo.focus();
+      else if (!fecha.value.trim()) fecha.focus();
+      else inst.focus();
+      return false;
+    }
+  }
+  return true;
+}
+
+
+
