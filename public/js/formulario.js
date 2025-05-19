@@ -595,6 +595,62 @@ function quitarExperiencia() {
 }
 
 
+let actualizacionIndex = 0;
+
+function agregarActualizacion() {
+  const container = document.getElementById("espacioActualizacion");
+
+  if (actualizacionIndex >= 6) return; // Máximo 10
+
+  const div = document.createElement("div");
+  div.classList.add("mb-4", "p-4", "rounded", "border", "border-gray-300", "bg-gray-50");
+
+  div.innerHTML = `
+    <p class="font-semibold text-gray-800 mb-2">Actualización ${actualizacionIndex + 1}</p>
+
+    <label class="block text-gray-700 font-semibold">Tema</label>
+    <input type="text" name="actualizacion_tema${actualizacionIndex}" class="acentos border w-full p-2 rounded-md bg-white mb-2" required>
+
+    <label class="block text-gray-700 font-semibold">Fecha (día/mes/año)</label>
+    <input type="text" name="actualizacion_fecha${actualizacionIndex}" data-format="dd-mm-yyyy" class="border w-full p-2 rounded-md bg-white mb-2" placeholder="DD-MM-AAAA" required>
+
+    <label class="block text-gray-700 font-semibold">Institución</label>
+    <input type="text" name="actualizacion_institucion${actualizacionIndex}" class="acentos border w-full p-2 rounded-md bg-white mb-2" required>
+
+    <label class="block text-gray-700 font-semibold">Documento recibido</label>
+    <input type="text" name="actualizacion_documento${actualizacionIndex}" class="acentos border w-full p-2 rounded-md bg-white mb-2" required>
+  `;
+
+  container.appendChild(div);
+
+  // Activar flatpickr + inputmask en el nuevo campo de fecha
+  const inputFecha = div.querySelector(`[name="actualizacion_fecha${actualizacionIndex}"]`);
+  flatpickr(inputFecha, {
+    dateFormat: "d-m-Y", // Día-Mes-Año
+    allowInput: true
+  });
+
+  Inputmask("99-99-9999", { placeholder: "dd-mm-yyyy" }).mask(inputFecha);
+
+  // Activar el filtro de acentos
+  const camposAcentos = div.querySelectorAll(".acentos");
+  camposAcentos.forEach(reemplazarAcentos);
+
+  actualizacionIndex++;
+  document.getElementById("actualizacionTotal").value = actualizacionIndex;
+}
+
+
+
+function quitarActualizacion() {
+  const container = document.getElementById("espacioActualizacion");
+  if (container.lastChild) {
+    container.removeChild(container.lastChild);
+    actualizacionIndex = Math.max(0, actualizacionIndex - 1);
+    document.getElementById("actualizacionTotal").value = actualizacionIndex;
+  }
+}
+
 let licVisible = 1;
 
 document.getElementById("mostrarMasLicenciaturas").addEventListener("click", () => {
