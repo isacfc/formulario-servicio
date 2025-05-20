@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
             // Iniciales label
             const labelIniciales = document.createElement("label");
-            labelIniciales.textContent = "Iniciales de la hija o hijo (Ejemplo: JIFC):";
+            labelIniciales.textContent = "Nombre completo empezando por apellidos de la hija o hijo (sin acentos):";
             labelIniciales.classList.add("block", "font-medium", "mb-1", "text-gray-700");
             divHijo.appendChild(labelIniciales);
     
@@ -153,7 +153,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const input = document.createElement("input");
             input.type = "text";
             input.name = "inicialesHijo" + i;
-            input.placeholder = "Ejemplo: JPG";
+            input.placeholder = "";
             input.classList.add("border", "rounded-full", "bg-gray-50", "m-2", "p-3", "uppercase");
             input.setAttribute("required", "true");
             divHijo.appendChild(input);
@@ -375,7 +375,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!validarEscolaridad("especialidad", 3, "Especialidad")) valido = false;
         if (!validarEscolaridad("doctorado", 2, "Doctorado")) valido = false;
 
-    
+         if (!validarActualizaciones(8)) valido = false;
         // Si alguna validación falla, prevenir envío
         if (!valido) {
             event.preventDefault();
@@ -518,7 +518,7 @@ div.innerHTML = `
 
 
 `;
-if(experienciaIndex < 10){
+if(experienciaIndex < 11){
 
     container.appendChild(div);
 
@@ -600,7 +600,7 @@ let actualizacionIndex = 0;
 function agregarActualizacion() {
   const container = document.getElementById("espacioActualizacion");
 
-  if (actualizacionIndex >= 6) return; // Máximo 10
+  if (actualizacionIndex >= 8) return; 
 
   const div = document.createElement("div");
   div.classList.add("mb-4", "p-4", "rounded", "border", "border-gray-300", "bg-gray-50");
@@ -761,28 +761,71 @@ document.getElementById("mostrarMasDoctorados").addEventListener("click", () => 
 
 
 
-
 function validarEscolaridad(prefix, cantidadMaxima, nombreVisible) {
   for (let i = 1; i <= cantidadMaxima; i++) {
     const titulo = document.querySelector(`[name="${prefix}_titulo${i}"]`);
     const fecha = document.querySelector(`[name="${prefix}_fecha${i}"]`);
     const inst = document.querySelector(`[name="${prefix}_institucion${i}"]`);
+    const documento = document.querySelector(`[name="${prefix}_documento${i}"]`);
+    const estatus = document.querySelector(`[name="${prefix}_estatus${i}"]`);
+    const cedula = document.querySelector(`[name="${prefix}_cedula${i}"]`);
 
-    if (!titulo || !fecha || !inst) continue;
+    // Si alguno de los campos obligatorios no existe, saltamos
+    if (!titulo || !fecha || !inst || !documento || !estatus) continue;
 
-    const hayAlgo = titulo.value.trim() || fecha.value.trim() || inst.value.trim();
-    const incompleto = !titulo.value.trim() || !fecha.value.trim() || !inst.value.trim();
+    const tieneAlgunDato =
+      titulo.value.trim() ||
+      fecha.value.trim() ||
+      inst.value.trim() ||
+      documento.value ||
+      estatus.value ||
+      (cedula && cedula.value.trim());
 
-    if (hayAlgo && incompleto) {
-      alert(`⚠️ Completa todos los campos de ${nombreVisible} ${i} o deja todos vacíos.`);
+    const incompleto =
+      !titulo.value.trim() ||
+      !fecha.value.trim() ||
+      !inst.value.trim() ||
+      !documento.value ||
+      !estatus.value;
+
+    if (tieneAlgunDato && incompleto) {
+      alert(`⚠️ Completa todos los campos obligatorios de ${nombreVisible} ${i} o deja todos vacíos.`);
       if (!titulo.value.trim()) titulo.focus();
       else if (!fecha.value.trim()) fecha.focus();
-      else inst.focus();
+      else if (!inst.value.trim()) inst.focus();
+      else if (!documento.value) documento.focus();
+      else if (!estatus.value) estatus.focus();
       return false;
     }
   }
   return true;
 }
+
+
+function validarActualizaciones(cantidadMaxima) {
+  for (let i = 0; i < cantidadMaxima; i++) {
+    const tema = document.querySelector(`[name="actualizacion_tema${i}"]`);
+    const fecha = document.querySelector(`[name="actualizacion_fecha${i}"]`);
+    const inst = document.querySelector(`[name="actualizacion_institucion${i}"]`);
+    const doc = document.querySelector(`[name="actualizacion_documento${i}"]`);
+
+    if (!tema || !fecha || !inst || !doc) continue;
+
+    const hayAlgo = tema.value.trim() || fecha.value.trim() || inst.value.trim() || doc.value.trim();
+    const incompleto = !tema.value.trim() || !fecha.value.trim() || !inst.value.trim() || !doc.value.trim();
+
+    if (hayAlgo && incompleto) {
+      alert(`⚠️ Completa todos los campos de la actualización profesional ${i + 1} o deja todos vacíos.`);
+      if (!tema.value.trim()) tema.focus();
+      else if (!fecha.value.trim()) fecha.focus();
+      else if (!inst.value.trim()) inst.focus();
+      else doc.focus();
+      return false;
+    }
+  }
+  return true;
+}
+
 
 
 

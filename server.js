@@ -10,6 +10,29 @@ const mysql = require('mysql2/promise');
 
 const session = require('express-session');
 
+const multer = require('multer');
+const uploadPath = path.join(__dirname, 'uploads');
+
+// Crear carpeta si no existe
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath);
+}
+
+// Configurar multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    const noTrabajador = req.session?.user?.noTrabajador || 'desconocido';
+    const nombreLimpio = file.fieldname + '-' +noTrabajador + ext;
+    cb(null, nombreLimpio);
+  }
+});
+
+const upload = multer({ storage });
+
 
 app.use(express.static('public')); // Es donde esta guardado mi CSS, imágenes, etc.
 app.use(bodyParser.urlencoded({ extended: false })); //decodificar la url de como llegan los datos
@@ -98,16 +121,32 @@ function convertirFechaTexto(fechaInput) {
     return `${nombresMeses[mesIndex]} ${anio}`;
 }
 
+function mesAnioAFechaOrdenable(fechaMMYYYY) {
+    if (!fechaMMYYYY) return null;
+    const [mes, anio] = fechaMMYYYY.split("-");
+    return new Date(`${anio}-${mes}-01`); // YYYY-MM-DD
+}
 
 
 
 // Ruta para guardar datos
-app.post('/guardar', async (req, res) => {
+
+app.post('/guardar', upload.fields([
+  { name: 'ine_pdf', maxCount: 1 },
+  { name: 'acta_pdf', maxCount: 1 },
+  { name: 'comprobante_domicilio_pdf', maxCount: 1 },
+  { name: 'comprobante_fiscal_pdf', maxCount: 1 }
+]), async (req, res) => {
+
     if (!req.session.user) {
         return res.redirect('/login');
     }
    
-    
+    const ineFile = req.files['ine_pdf']?.[0];
+    const actaFile = req.files['acta_pdf']?.[0];
+    const domicilioFile = req.files['comprobante_domicilio_pdf']?.[0];
+    const fiscalFile = req.files['comprobante_fiscal_pdf']?.[0];
+
 
     const { telefono,fechaIngreso,adscripcionActual,cargoActual, sexo,fechaNacimiento,lugarNacimiento,codigopostal,correo, papa, embarazo,  cantidadHijos, cronica,civil,sangre,telefonocasa,telefonofamiliar,parentesco,primaria,secundaria_institucion } = req.body;
     const { idTrabajador } = req.session.user;
@@ -167,6 +206,7 @@ app.post('/guardar', async (req, res) => {
     if (civil!="Casado/a"){
         nombreConyuge="N/A";
         fechaConyuge="00-00-0000";
+        sexoConyuge="N/A";
          
     }
 
@@ -377,6 +417,42 @@ app.post('/guardar', async (req, res) => {
         }
         }
 
+         const deleteQuery4 = 'DELETE FROM actualizacionprofesional WHERE idTrabajador = ?';
+        await db.query(deleteQuery4, [idTrabajador]);
+
+        let actualizaciones = [];
+        for (let i = 0; i < 11; i++) {
+        const tema = req.body[`actualizacion_tema${i}`];
+        const fecha = req.body[`actualizacion_fecha${i}`];
+        const institucion = req.body[`actualizacion_institucion${i}`];
+        const documento = req.body[`actualizacion_documento${i}`];
+
+        const hayDatos = tema || fecha || institucion || documento;
+
+        if (hayDatos) {
+            actualizaciones.push({ tema, fecha, institucion, documento });
+        }
+        }
+
+        // Paso 2: ordenar por fecha descendente
+        actualizaciones.sort((a, b) => {
+        const fa = new Date(convertirFecha(a.fecha));
+        const fb = new Date(convertirFecha(b.fecha));
+        return fb - fa; // descendente
+        });
+
+        // Paso 3: insertar ya ordenado
+        for (let act of actualizaciones) {
+        const fechaConvertida = act.fecha ? convertirFecha(act.fecha) : null;
+
+        await db.query(
+            `INSERT INTO actualizacionprofesional (tema, fecha, institucion, documento, idTrabajador)
+            VALUES (?, ?, ?, ?, ?)`,
+            [act.tema, fechaConvertida, act.institucion, act.documento, idTrabajador]
+        );
+        }
+
+
 
 
         const deleteQuery3 = 'DELETE FROM experienciapj WHERE idTrabajador = ?';
@@ -384,46 +460,60 @@ app.post('/guardar', async (req, res) => {
         cantidadExpPJ = req.body["experienciaTotal"];
 
         if (cantidadExpPJ && cantidadExpPJ > 0) {
-            //const deleteQuery2 = 'DELETE FROM experienciapj WHERE idTrabajador = ?';
-            //await db.query(deleteQuery2, [idTrabajador]);
-            // (Opcional: podrías borrar registros anteriores de hijos para ese trabajador, si se requiere)
+            let experiencias = [];
+
             for (let i = 0; i < cantidadExpPJ; i++) {
-                // Extraemos cada dato dinámico. Asegúrate que en el form los inputs tengan nombres: 
-                // inicialesHijo0, fechaNacimientoHijo0, edadHijo0, etc.
-                let exp_inicio = req.body[`experiencia_inicio${i}`];
-                let exp_fin = req.body[`experiencia_fin${i}`];
+                const rawInicio = req.body[`experiencia_inicio${i}`]; // ej. "05-2023"
+                const rawFin = req.body[`experiencia_fin${i}`];       // ej. "08-2024"
+                let institucion = req.body[`experiencia_institucion${i}`];
+                let adscripcion = req.body[`experiencia_adscripcion${i}`];
+                const puesto = req.body[`experiencia_puesto${i}`];
+                const campo = req.body[`experiencia_campo${i}`];
 
-                exp_inicio = convertirFechaTexto(exp_inicio);
-                exp_fin = convertirFechaTexto(exp_fin)
-
-                let exp_institucion = req.body[`experiencia_institucion${i}`];
-
-                
-                let exp_adscripcion = req.body[`experiencia_adscripcion${i}`];
-
-                if (exp_institucion === "OTRA"){
-                    exp_adscripcion= ""
-                    exp_institucion = req.body[`experiencia_otrainst${i}`];
-                } else{
-                    exp_institucion = "PODER JUDICIAL DEL ESTADO DE HIDALGO"
-                    
+                if (institucion === "OTRA") {
+                    adscripcion = "";
+                    institucion = req.body[`experiencia_otrainst${i}`];
+                } else {
+                    institucion = "PODER JUDICIAL DEL ESTADO DE HIDALGO";
                 }
 
+                // Convertimos fechas para ordenar correctamente
+                const fechaOrdenable = (mesY) => {
+                    if (!mesY || typeof mesY !== "string") return new Date(0); // valor mínimo
+                    const [mes, anio] = mesY.split("-");
+                    return new Date(parseInt(anio), parseInt(mes) - 1);
+                };
 
-                const exp_puesto = req.body[`experiencia_puesto${i}`];
-                const exp_campo = req.body[`experiencia_campo${i}`];
+                experiencias.push({
+                    inicioTexto: rawInicio,
+                    finTexto: rawFin,
+                    inicioOrden: fechaOrdenable(rawInicio),
+                    finOrden: fechaOrdenable(rawFin),
+                    institucion,
+                    adscripcion,
+                    puesto,
+                    campo
+                });
+            }
 
-                
-                
+            // Ordenar por fecha de fin descendente
+            experiencias.sort((a, b) => b.finOrden - a.finOrden);
 
-                // Ahora guarda en MySQL usando fechaFormateada
-
-
-                // Consulta para insertar cada hijo. Se asume que la tabla se llama "hijo" y tiene las columnas:
-                // id (auto-increment), idTrabajador, iniciales, fechaNacimiento y edad.
-                const expQuery = 'INSERT INTO experienciapj (periodoInicio,periodoFin,institucion, adscripcion, cargo, campoExperiencia, idTrabajador) VALUES (?,?,?,?,?,?,?)';
-                await db.query(expQuery, [exp_inicio, exp_fin, exp_institucion, exp_adscripcion, exp_puesto, exp_campo, idTrabajador]);
-                console.log(`✅ Experiencia de Poder Judicial ${i + 1} guardado:`, expQuery);
+            for (let exp of experiencias) {
+                await db.query(
+                    `INSERT INTO experienciapj (periodoInicio, periodoFin, institucion, adscripcion, cargo, campoExperiencia, idTrabajador)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        convertirFechaTexto(exp.inicioTexto),
+                        convertirFechaTexto(exp.finTexto),
+                        exp.institucion,
+                        exp.adscripcion,
+                        exp.puesto,
+                        exp.campo,
+                        idTrabajador
+                    ]
+                );
+                console.log(`✅ Experiencia insertada: ${exp.puesto}`);
             }
         }
 
@@ -518,7 +608,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         
         const [escolaridades] = await db.query('SELECT * FROM escolaridad WHERE idTrabajador = ?', [idTrabajador]);
 
-        
+         const [actualizaciones] = await db.query('SELECT * FROM actualizacionprofesional WHERE idTrabajador = ?', [idTrabajador]);
         ///const [experiencias] = await db.query('SELECT * FROM experienciapj WHERE idTrabajador = ?', [idTrabajador]);
 
         ///console.log(experiencias)
@@ -669,6 +759,14 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
             
         });
 
+        actualizaciones.forEach((exp, index) => {
+            const fila = 69 + index; // Ejemplo: empieza en fila 40
+            worksheet.getCell(`A${fila}`).value = exp.tema;
+            worksheet.getCell(`B${fila}`).value = formatearFecha(exp.fecha);
+            worksheet.getCell(`C${fila}`).value = exp.institucion;
+            worksheet.getCell(`F${fila}`).value = exp.documento;
+        });
+
         const experienciasPJ = experiencias.filter(
             exp => exp.institucion.toUpperCase() === "PODER JUDICIAL DEL ESTADO DE HIDALGO"
           );
@@ -689,14 +787,52 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
         await workbook.xlsx.writeFile(rutaCompleta);
 
-        res.download(rutaCompleta, (err) => {
-            if (err) {
-                console.error('Error al enviar el archivo:', err);
-            } else {
-                // Limpieza: eliminar después de descargar
-                fs.unlinkSync(rutaCompleta);
+        const archiver = require('archiver');
+
+        // Crear el archivo ZIP
+        const zipNombre = `reporte_${trabajador.noTrabajador}.zip`;
+        const zipRuta = path.join('./reportes', zipNombre);
+        const output = fs.createWriteStream(zipRuta);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        output.on('close', () => {
+            console.log(`📦 ZIP creado con ${archive.pointer()} bytes`);
+            res.download(zipRuta, (err) => {
+                if (err) {
+                    console.error('Error al enviar ZIP:', err);
+                } else {
+                    fs.unlinkSync(zipRuta); // Limpieza después de enviar
+                    fs.unlinkSync(rutaCompleta); // Elimina el Excel temporal también
+                }
+            });
+        });
+
+        archive.on('error', err => {
+            throw err;
+        });
+
+        archive.pipe(output);
+
+        // Adjunta el Excel generado
+        archive.file(rutaCompleta, { name: path.basename(rutaCompleta) });
+
+        // Archivos PDF
+        const uploadsPath = path.join(__dirname, 'uploads');
+        const pdfs = [
+            `ine_pdf-${trabajador.noTrabajador}.pdf`,
+            `acta_pdf-${trabajador.noTrabajador}.pdf`,
+            `comprobante_domicilio_pdf-${trabajador.noTrabajador}.pdf`,
+            `comprobante_fiscal_pdf-${trabajador.noTrabajador}.pdf`
+        ];
+
+        pdfs.forEach(nombre => {
+            const ruta = path.join(uploadsPath, nombre);
+            if (fs.existsSync(ruta)) {
+                archive.file(ruta, { name: nombre });
             }
         });
+
+        await archive.finalize();
 
     } catch (error) {
         console.error('Error generando el reporte:', error);
