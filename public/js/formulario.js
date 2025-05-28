@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         console.log(estadoCivil);
 
-        if (estadoCivil === "Casado/a"){
+        if (estadoCivil === "Casado/a" || estadoCivil === "Unionlibre"){
             datosConyuge.classList.remove("hidden");
             for (let i = 0; i < camposConyuge.length; i++) {
                 camposConyuge[i].required = true;
@@ -375,7 +375,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!validarEscolaridad("especialidad", 3, "Especialidad")) valido = false;
         if (!validarEscolaridad("doctorado", 2, "Doctorado")) valido = false;
 
-         if (!validarActualizaciones(8)) valido = false;
+         if (!validarActualizaciones(10)) valido = false;
         // Si alguna validación falla, prevenir envío
         if (!valido) {
             event.preventDefault();
@@ -386,6 +386,11 @@ document.addEventListener("DOMContentLoaded", function() {
             else if (sangrecombo.value === "Seleccione") civilcombo.focus();
             else if (errorMessage.style.display === 'inline') telefonoInput.focus();
             else postalInput.focus();
+        }
+        
+        if (valido) {
+          botonFormulario.disabled = true;
+          botonFormulario.textContent = "Enviando...";
         }
     });
 
@@ -446,7 +451,282 @@ document.addEventListener("DOMContentLoaded", function() {
     camposAcentos.forEach(reemplazarAcentos);
 
 
+    const selectCargo = document.getElementById('cargoActual');
+    const otroCargoContainer = document.getElementById('otroCargoContainer');
+    const otroCargoInput = document.getElementById('otroCargoInput');
+
+    if (selectCargo) {
+      selectCargo.addEventListener('change', function () {
+        if (selectCargo.value === 'Otro') {
+          otroCargoContainer.classList.remove('hidden');
+          otroCargoInput.setAttribute("required",true);
+        } else {
+          otroCargoContainer.classList.add('hidden');
+          otroCargoInput.value = ''; // limpiar campo si cambia
+          otroCargoInput.removeAttribute("required");
+        }
+      });
+    }
+
+
+    const radios = document.querySelectorAll('input[name="coincideDomicilio"]');
+  const actualContainer = document.getElementById('domicilioActualContainer');
+
+
+     radios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.value === '0') {
+        actualContainer.classList.remove('hidden');
+        actualContainer.querySelectorAll('input').forEach(input => input.setAttribute('required', true));
+      } else {
+        actualContainer.classList.add('hidden');
+        actualContainer.querySelectorAll('input').forEach(input => {
+          input.removeAttribute('required');
+          input.value = '';
+        });
+      }
+    });
+  });
+
+
+   const radiosIndigena = document.querySelectorAll('input[name="indigena"]');
+  const comunidadContainer = document.getElementById('comunidadIndigenaContainer');
+  const comunidadSelect = document.querySelector('select[name="comunidadIndigena"]');
+
+  radiosIndigena.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.value === '1') {
+        comunidadContainer.classList.remove('hidden');
+        comunidadSelect.setAttribute('required', true);
+      } else {
+        comunidadContainer.classList.add('hidden');
+        comunidadSelect.removeAttribute('required');
+        comunidadSelect.value = '';
+      }
+    });
+  });
+
+  const radiosLengua = document.querySelectorAll('input[name="hablaLenguaIndigena"]');
+  const familiaContainer = document.getElementById('familiaLingContainer');
+  const familiaSelect = document.querySelector('select[name="familiaLinguistica"]');
+
+  radiosLengua.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.value === '1') {
+        familiaContainer.classList.remove('hidden');
+        familiaSelect.setAttribute('required', true);
+      } else {
+        familiaContainer.classList.add('hidden');
+        familiaSelect.removeAttribute('required');
+        familiaSelect.value = '';
+      }
+    });
+  });
+
+  const radiosDiscapacidad = document.querySelectorAll('input[name="discapacidad"]');
+  const discapacidadContainer = document.getElementById('tipoDiscapacidadContainer');
+  const discapacidadInput = document.getElementById('tipoDiscapacidadInput');
+
+  radiosDiscapacidad.forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.value === '1') {
+        discapacidadContainer.classList.remove('hidden');
+        discapacidadInput.setAttribute('required', true);
+      } else {
+        discapacidadContainer.classList.add('hidden');
+        discapacidadInput.removeAttribute('required');
+        discapacidadInput.value = '';
+      }
+    });
+  });
+
+  const niveles = [
+    { key: 'Licenciatura', max: 3 },
+    { key: 'Maestria',     max: 3 },
+    { key: 'Doctorado',    max: 2 },
+     { key: 'Posdoctorado',    max: 2 },
+    { key: 'Especialidad', max: 3 },
+  ];
+const placeholders = {
+  licenciatura: {
+    titulo:       "Ej. DERECHO, PSICOLOGIA, ADMINISTRACION",
+    institucion:  "Ej. UNIVERSIDAD AUTONOMA DEL ESTADO DE HIDALGO",
+    fecha: "dd-mm-yyyy",
+    documento:    "Diploma / Certificado",
+    estatus:      "Concluido / En curso / Titulado",
+    cedula:       "Ej. 1234567"
+  },
+  maestria: {
+    titulo:      "Ej. DERECHO CONSTITUCIONAL",
+    fecha: "dd-mm-yyyy",
+    institucion: "Ej. UNIVERSIDAD AUTONOMA DEL ESTADO DE HIDALGO",
+    // ...y así para los demás si quieres
+  },
+  // similar para especialidad, doctorado...
+};
+  niveles.forEach(({ key, max }) => {
+  const tieneRadio    = document.querySelectorAll(`input[name="tiene${key}"]`);
+  const qtyContainer  = document.getElementById(`${key.toLowerCase()}CantidadContainer`);
+  const qtyInput      = document.getElementById(`${key.toLowerCase()}Cantidad`);
+  const listaDiv      = document.getElementById(`${key.toLowerCase()}Lista`);
+
+  // Mostrar/ocultar el contador
+  tieneRadio.forEach(radio =>
+    radio.addEventListener('change', () => {
+      if (radio.value === '1') {
+        qtyContainer.classList.remove('hidden');
+        qtyInput.setAttribute('required', true);
+      } else {
+        qtyContainer.classList.add('hidden');
+        qtyInput.removeAttribute('required');
+        qtyInput.value = '';
+        listaDiv.innerHTML = '';
+      }
+    })
+  );
+
+  // Generar bloques según la cantidad
+  qtyInput.addEventListener('input', () => {
+    const n = Math.min(max, Math.max(0, parseInt(qtyInput.value || 0)));
+    listaDiv.innerHTML = '';
+
+    // Aquí sí usamos `key`, no `nivel`
+    const ph = placeholders[key.toLowerCase()] || {};
+
+    for (let i = 1; i <= n; i++) {
+      listaDiv.insertAdjacentHTML('beforeend', `
+        <div class="border p-3 mt-4 mb-3">
+          <p class="font-semibold mb-2">${key} ${i}</p>
+
+          <label class="block mb-1">Nombre del título</label>
+          <input type="text"
+                 name="${key.toLowerCase()}_titulo${i}"
+                 placeholder="${ph.titulo || ''}"
+                 required
+                 class="border p-2 w-full rounded mb-2 acentos">
+
+          <label class="block mb-1">Fecha de obtención</label>
+          <input type="date"
+                 name="${key.toLowerCase()}_fecha${i}"
+                 required
+                placeholder="${ph.fecha || ''}"
+                 data-format="dd-mm-yyyy"
+                 class="border p-2 w-full rounded mb-2">
+
+          <label class="block mb-1">Institución</label>
+          <input type="text"
+                 name="${key.toLowerCase()}_institucion${i}"
+                 placeholder="${ph.institucion || ''}"
+                 required
+                 class="border p-2 w-full rounded mb-2 acentos">
+
+          <label class="block mb-1">Documento</label>
+          <select name="${key.toLowerCase()}_documento${i}"
+                  required
+                  class="border p-2 w-full rounded mb-2">
+            <option value=""> Selecciona documento</option>
+            <option value="DIPLOMA">DIPLOMA</option>
+            <option value="CONSTANCIA">CONSTANCIA</option>
+            <option value="CERTIFICADO">CERTIFICADO</option>
+            <option value="TITULO">TÍTULO</option>
+            <option value="CEDULA">CÉDULA</option>
+            <option value="TITULO Y CEDULA">TÍTULO Y CÉDULA</option>
+          </select>
+
+          <label class="block mb-1">Estatus</label>
+          <select name="${key.toLowerCase()}_estatus${i}"
+                  required
+                  class="border p-2 w-full rounded mb-2">
+            <option value="">Selecciona estatus</option>
+            <option value="INCONCLUSO">INCONCLUSO</option>
+            <option value="EN CURSO">EN CURSO</option>
+            <option value="CONCLUIDO">CONCLUIDO</option>
+            <option value="TITULADO">TITULADO</option>
+          </select>
+
+          <label class="block mb-1">Cédula profesional</label>
+          <input type="number"
+                 name="${key.toLowerCase()}_cedula${i}"
+                 placeholder="${ph.cedula || ''}"
+                 class="border p-2 w-full rounded mb-2">
+        </div>
+      `);
+
+      configurarFechaInputs();
+      procesarCamposAcentos();
+    }
+  });
 });
+
+
+const rsTec = document.querySelectorAll('input[name="tieneTecnica"]');
+  const contTec = document.getElementById('tecnicaContainer');
+  const inpTec = contTec.querySelector('input[name="tecnica_institucion"]');
+  rsTec.forEach(r => r.addEventListener('change', () => {
+    if (r.value==='1') {
+      contTec.classList.remove('hidden');
+      inpTec.setAttribute('required',true);
+    } else {
+      contTec.classList.add('hidden');
+      inpTec.removeAttribute('required');
+      inpTec.value='';
+    }
+  }));
+  // Bachillerato
+  const rsPre = document.querySelectorAll('input[name="tieneBachillerato"]');
+  const contPre = document.getElementById('bachilleratoContainer');
+  const camposPre = contPre.querySelectorAll('input, select');
+  rsPre.forEach(r => r.addEventListener('change', () => {
+    if (r.value==='1') {
+      contPre.classList.remove('hidden');
+      camposPre.forEach(el=>el.setAttribute('required',true));
+    } else {
+      contPre.classList.add('hidden');
+      camposPre.forEach(el=>{
+        el.removeAttribute('required'); el.value='';
+      });
+    }
+  }));
+    
+      
+
+
+});
+
+function configurarFechaInputs() {
+    // Configuración para inputs con formato "d-m-Y"
+    document.querySelectorAll("input[data-format='dd-mm-yyyy']").forEach(function(input) {
+        flatpickr(input, {
+            dateFormat: "d-m-Y",
+            allowInput: true
+        });
+
+        Inputmask("99-99-9999", { placeholder: "dd-mm-yyyy" }).mask(input);
+    });
+
+    // Configuración para inputs con formato "mm-yyyy"
+    document.querySelectorAll("input[data-format='mm-yyyy']").forEach(function(input) {
+        flatpickr(input, {
+            plugins: [
+                new monthSelectPlugin({
+                    shorthand: false,
+                    dateFormat: "m-Y",   // Cómo se guarda
+                    altFormat: "F Y",    // Cómo se muestra (opcional)
+                    theme: "light",
+                    allowInput: true
+                })
+            ],
+            allowInput: true
+        });
+
+        Inputmask("99-9999", { placeholder: "mm-yyyy" }).mask(input);
+    });
+}
+
+function procesarCamposAcentos() {
+    const camposAcentos = document.querySelectorAll('.acentos');
+    camposAcentos.forEach(reemplazarAcentos);
+}
 
 
 function reemplazarAcentos(campo){
@@ -483,11 +763,15 @@ const div = document.createElement("div");
 div.classList.add("mb-3", "p-4", "rounded", "border", "border-gray-300");
 
 div.innerHTML = `
+<p class="font-semibold text-gray-800 mb-1">Experiencia ${experienciaIndex+1}</p>
 <label class="block text-gray-700 font-semibold">Periodo: Mes/Año de inicio</label>
 <input type="text" name="experiencia_inicio${experienciaIndex}" data-format="mm-yyyy" required class="border w-full p-2 rounded-md bg-gray-50 mb-2" placeholder="MM-AAAA">
 
 <label class="block text-gray-700 font-semibold"> Periodo: Mes/Año de fin</label>
-<input type="month" name="experiencia_fin${experienciaIndex}" data-format="mm-yyyy" required class="border w-full p-2 rounded-md bg-gray-50"  placeholder="MM-AAAA">
+<input type="month" name="experiencia_fin${experienciaIndex}" id="experiencia_fin${experienciaIndex}" data-format="mm-yyyy" required class="border w-full p-2 rounded-md bg-gray-50"  placeholder="MM-AAAA">
+
+
+<input type="checkbox" name="experiencia_actual${experienciaIndex}" id="experiencia_actual${experienciaIndex}"> A LA FECHA </input>
 
 <label class="block text-gray-700 font-semibold">Institución</label>
   <select name="experiencia_institucion${experienciaIndex}"
@@ -518,9 +802,13 @@ div.innerHTML = `
 
 
 `;
-if(experienciaIndex < 11){
+
+
+if(experienciaIndex < 100){
 
     container.appendChild(div);
+
+    
 
 
     
@@ -551,6 +839,22 @@ if(experienciaIndex < 11){
       
       // Escucha cambios
       selectInst.addEventListener('change', toggleCampos);
+      
+      const finInput = document.getElementById(`experiencia_fin${experienciaIndex}`);
+      const actualCb = document.getElementById(`experiencia_actual${experienciaIndex}`);
+
+      actualCb.addEventListener("change", () => {
+        if (actualCb.checked) {
+          // ocultar visualmente y quitar validación
+          finInput.classList.add("hidden");
+          finInput.removeAttribute("required");
+          finInput.value = "";      // limpia cualquier valor previo
+        } else {
+          // volver a mostrar y requerir
+          finInput.classList.remove("hidden");
+          finInput.setAttribute("required", "true");
+        }
+      });
       
 
       experienciaIndex++;
@@ -600,7 +904,7 @@ let actualizacionIndex = 0;
 function agregarActualizacion() {
   const container = document.getElementById("espacioActualizacion");
 
-  if (actualizacionIndex >= 8) return; 
+  if (actualizacionIndex >= 10) return; 
 
   const div = document.createElement("div");
   div.classList.add("mb-4", "p-4", "rounded", "border", "border-gray-300", "bg-gray-50");
@@ -618,8 +922,15 @@ function agregarActualizacion() {
     <input type="text" name="actualizacion_institucion${actualizacionIndex}" class="acentos border w-full p-2 rounded-md bg-white mb-2" required>
 
     <label class="block text-gray-700 font-semibold">Documento recibido</label>
-    <input type="text" name="actualizacion_documento${actualizacionIndex}" class="acentos border w-full p-2 rounded-md bg-white mb-2" required>
-  `;
+     <select  class="acentos border w-full p-2 rounded-md bg-white mb-2" id="adscripcionActual" name="actualizacion_documento${actualizacionIndex}" required>
+      <option value="">Seleccione documento</option>
+      <option value="CERTIFICADO">CERTIFICADO</option>
+      <option value="DIPLOMA">DIPLOMA</option>
+      <option value="CONSTANCIA">CONSTANCIA</option>
+      <option value="RECONOCIMIENTO">RECONOCIMIENTO</option>
+    </select>
+  
+    `;
 
   container.appendChild(div);
 

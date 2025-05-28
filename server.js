@@ -68,6 +68,24 @@ app.get('/success', (req, res) => {
     res.render('success');
 });
 
+app.get('/buscador', (req, res) => {
+  res.render('buscador'); // si usas EJS
+});
+
+app.get('/existe/:noTrabajador', async (req, res) => {
+  const noTrabajador = req.params.noTrabajador;
+
+  try {
+    const [result] = await db.query('SELECT COUNT(*) AS total FROM trabajador WHERE noTrabajador = ?', [noTrabajador]);
+    const existe = result[0].total > 0;
+    res.json({ existe });
+  } catch (error) {
+    console.error("Error al verificar trabajador:", error);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+
 
 app.get('/insert', (req, res) => {
     res.render('insert', { error: null });
@@ -148,14 +166,27 @@ app.post('/guardar', upload.fields([
     const fiscalFile = req.files['comprobante_fiscal_pdf']?.[0];
 
 
-    const { telefono,fechaIngreso,adscripcionActual,cargoActual, sexo,fechaNacimiento,lugarNacimiento,codigopostal,correo, papa, embarazo,  cantidadHijos, cronica,civil,sangre,telefonocasa,telefonofamiliar,parentesco,primaria,secundaria_institucion } = req.body;
+    const { telefono,fechaIngreso,adscripcionActual, lenguaSenias,sexo,fechaNacimiento,municipioNacimiento,estadoNacimiento,codigopostal,correo, papa, embarazo,  cantidadHijos, cronica,civil,sangre,telefonocasa,telefonofamiliar,parentesco,primaria,secundaria_institucion } = req.body;
     const { idTrabajador } = req.session.user;
 
+    const lugarNacimiento = `${municipioNacimiento.trim().toUpperCase()}, ${estadoNacimiento.trim().toUpperCase()}`;
+
+    let cargoActual = req.body.cargoActual;
+
+    if (cargoActual === "Otro") {
+        cargoActual = req.body.otroCargo?.trim().toUpperCase() || "OTRO";
+    }
 
     const callenumero = req.body.callenumero.toUpperCase();
     const colonia = req.body.colonia.toUpperCase();
     const municipio = req.body.municipio.toUpperCase();
     const estado = req.body.estado.toUpperCase();
+
+    let actualCallenumero = req.body.actual_callenumero || callenumero;
+    let actualColonia = req.body.actual_colonia || colonia;
+    let actualMunicipio = req.body.actual_municipio || municipio;
+    let actualEstado = req.body.actual_estado || estado;
+    let actualCP = req.body.actual_codigopostal || codigopostal;
     
 
     console.log("Papa: " + papa + " y " + sexo);
@@ -168,8 +199,46 @@ app.post('/guardar', upload.fields([
     let padre;
     let embarazada;
 
-    let carreraTecnica = req.body.tecnica_institucion;
-    const query = 'UPDATE trabajador SET  fechaIngreso=?, adscripcionActual=?,cargoActual=?,sexoTrabajador = ?,fechaNacimiento=?,lugarNacimiento=?,estadoCivil=?,nombreConyuge=?,fechaNacimientoConyuge=?,sexoConyuge=?,tipoSangre=?,calleNumero=?,colonia=?,municipio=?,estado=?,codigoPostal=?,  noTelefono = ?,telefonoCasa=?,telefonoFamiliar=?,parentescoFamiliar=?, correoElectronico=?,tieneEnfermedadCronica=?,tipoCronica=?, es_padre_madre=? , embarazada = ?, cantidadHijos = ?,primaria=?,secundaria=?, carreraTecnicaComercial=? WHERE idTrabajador = ?';
+    
+    const comunidadIndigena = req.body.indigena === '1'
+    ? req.body.comunidadIndigena?.trim().toUpperCase() || 'N/A'
+    : 'N/A';
+
+    const familiaLinguistica = req.body.hablaLenguaIndigena === '1'
+    ? req.body.familiaLinguistica?.trim().toUpperCase() || 'N/A'
+    : 'N/A';
+
+    
+    const tipoDiscapacidad = req.body.discapacidad === '1'
+    ? req.body.tipoDiscapacidad?.trim().toUpperCase() || 'NO ESPECIFICADA'
+    : 'N/A';
+
+    ///let carreraTecnica = req.body.tecnica_institucion;
+
+    const tieneTecnica = req.body.tieneTecnica === '1';
+    const carreraTecnicaComercial = tieneTecnica
+    ? req.body.tecnica_institucion.trim().toUpperCase()
+    : 'No';
+
+    const tieneBachillerato = req.body.tieneBachillerato === '1';
+    const prepaTitulo       = tieneBachillerato
+    ? req.body.prepa_titulo.trim().toUpperCase()
+    : null;
+    const prepaFecha        = tieneBachillerato
+    ? convertirFechaTexto(req.body.prepa_fecha)
+    : null;
+    const prepaInst         = tieneBachillerato
+    ? req.body.prepa_institucion.trim().toUpperCase()
+    : null;
+    const prepaDocumento    = tieneBachillerato
+    ? req.body.prepa_documento
+    : null;
+    const prepaEstatus      = tieneBachillerato
+    ? req.body.prepa_estatus
+    : null;
+
+
+    const query = 'UPDATE trabajador SET  fechaIngreso=?, adscripcionActual=?,cargoActual=?,sexoTrabajador = ?,fechaNacimiento=?,lugarNacimiento=?,estadoCivil=?,nombreConyuge=?,fechaNacimientoConyuge=?,sexoConyuge=?,tipoSangre=?,calleNumero=?,colonia=?,municipio=?,estado=?,codigoPostal=?,actualCalleNumero=?,actualColonia=?,actualMunicipio=?,actualEstado=?, actualCP=?,  noTelefono = ?,telefonoCasa=?,telefonoFamiliar=?,parentescoFamiliar=?, correoElectronico=?,comunidadIndigena=?,familiaLinguistica=?,tipoDiscapacidad=?,lenguajeSenias=?,tieneEnfermedadCronica=?,tipoCronica=?, es_padre_madre=? , embarazada = ?, cantidadHijos = ?,primaria=?,secundaria=?, carreraTecnicaComercial=? WHERE idTrabajador = ?';
     
     if ( papa == 1 && sexo == "Femenino"){
 
@@ -228,7 +297,7 @@ app.post('/guardar', upload.fields([
         const fechaFormateada = convertirFecha(fechaConyuge);
         const fechaIngresoFormateada = convertirFecha(fechaIngreso);
         const fechaNacimientoFormateada = convertirFecha(fechaNacimiento);
-        const [result] = await db.query(query, [fechaIngresoFormateada,adscripcionActual,cargoActual,sexo,fechaNacimientoFormateada,lugarNacimiento,civil,nombreConyuge,fechaFormateada,sexoConyuge,sangre,callenumero,colonia,municipio,estado,codigopostal,telefono,telefonocasa,telefonofamiliar,parentesco,correo,tieneCronica,cronicaTexto, padre, embarazada, cantidadHijos,primaria,secundaria_institucion, carreraTecnica, idTrabajador]);
+        const [result] = await db.query(query, [fechaIngresoFormateada,adscripcionActual,cargoActual,sexo,fechaNacimientoFormateada,lugarNacimiento,civil,nombreConyuge,fechaFormateada,sexoConyuge,sangre,callenumero,colonia,municipio,estado,codigopostal,actualCallenumero,actualColonia, actualMunicipio, actualEstado, actualCP, telefono,telefonocasa,telefonofamiliar,parentesco,correo,comunidadIndigena,familiaLinguistica,tipoDiscapacidad,lenguaSenias,tieneCronica,cronicaTexto, padre, embarazada, cantidadHijos,primaria,secundaria_institucion, carreraTecnicaComercial, idTrabajador]);
         console.log('✅ Actualización exitosa:', result);
 
 
@@ -265,6 +334,81 @@ app.post('/guardar', upload.fields([
         }
         const deleteQuery2 = 'DELETE FROM escolaridad WHERE idTrabajador = ?';
         await db.query(deleteQuery2, [idTrabajador]);
+
+
+        // Después de eliminar las filas antiguas:
+        await db.query('DELETE FROM escolaridad WHERE idTrabajador = ?', [idTrabajador]);
+
+        // Define tus niveles y máximos permitidos
+        const niveles      = ['licenciatura', 'maestria', 'doctorado', 'posdoctorado', 'especialidad'];
+        const maximos      = { licenciatura: 3, maestria: 3, doctorado: 2, posdoctorado:2, especialidad: 3 };
+
+        // Prepara tu INSERT
+        const insertQuery = `
+        INSERT INTO escolaridad
+            (nivelAcademico, nombreTitulo, fechaObtencion, institucion,
+            documentoAdquirido, estatus, cedulaProfesional, idTrabajador)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+
+        if (req.body.tieneBachillerato === '1') {
+        await db.query(insertQuery, [
+            "BACHILLERATO",
+            req.body.prepa_titulo.trim().toUpperCase(),
+            convertirFecha(req.body.prepa_fecha),
+            req.body.prepa_institucion.trim().toUpperCase(),
+            req.body.prepa_documento,
+            req.body.prepa_estatus,
+            null,           // cedula
+            idTrabajador
+        ]);
+        }
+
+        for (let nivel of niveles) {
+        // Lee cuántos registros pidió el usuario
+        const cantidadRaw = req.body[`${nivel}Cantidad`];
+        const cantidad    = Math.min(
+            maximos[nivel],
+            Math.max(0, parseInt(cantidadRaw, 10) || 0)
+        );
+
+        for (let i = 1; i <= cantidad; i++) {
+            // Construye dinámicamente los nombres de campo
+            const tituloField      = `${nivel}_titulo${i}`;
+            const fechaField       = `${nivel}_fecha${i}`;
+            const institucionField = `${nivel}_institucion${i}`;
+            const documentoField   = `${nivel}_documento${i}`;
+            const estatusField     = `${nivel}_estatus${i}`;
+            const cedulaField      = `${nivel}_cedula${i}`;
+
+            const titulo      = req.body[tituloField]?.trim()      || null;
+            const fechaRaw    = req.body[fechaField]               || null; // yyyy-mm-dd
+            const institucion = req.body[institucionField]?.trim() || null;
+            const documento   = req.body[documentoField]           || null;
+            const estatus     = req.body[estatusField]             || null;
+            const cedula      = req.body[cedulaField]?.trim()      || null;
+
+            // Solo inserta si al menos uno de los campos principales está presente
+            if (titulo || fechaRaw || institucion) {
+            // Si necesitas formatear la fecha para Excel o MySQL DATE
+            const fecha = fechaRaw; // o convertirFechaTexto(fechaRaw) si lo deseas
+
+            await db.query(insertQuery, [
+                nivel.toUpperCase(),  // nivelAcademico
+                titulo,
+                fecha,
+                institucion,
+                documento,
+                estatus,
+                cedula,
+                idTrabajador
+            ]);
+            }
+        }
+        }
+
+        /*
         console.log(`Escolaridad eliminada para trabajador ${idTrabajador}`);
 
         const escolaridades = [
@@ -415,8 +559,10 @@ app.post('/guardar', upload.fields([
         
             console.log(`✅ Escolaridad ${escolaridad.nivel} guardada`);
         }
+            
         }
 
+        */
          const deleteQuery4 = 'DELETE FROM actualizacionprofesional WHERE idTrabajador = ?';
         await db.query(deleteQuery4, [idTrabajador]);
 
@@ -457,6 +603,8 @@ app.post('/guardar', upload.fields([
 
         const deleteQuery3 = 'DELETE FROM experienciapj WHERE idTrabajador = ?';
         await db.query(deleteQuery3, [idTrabajador]);
+
+        
         cantidadExpPJ = req.body["experienciaTotal"];
 
         if (cantidadExpPJ && cantidadExpPJ > 0) {
@@ -469,7 +617,13 @@ app.post('/guardar', upload.fields([
                 let adscripcion = req.body[`experiencia_adscripcion${i}`];
                 const puesto = req.body[`experiencia_puesto${i}`];
                 const campo = req.body[`experiencia_campo${i}`];
+                
+                const periodoInicio = convertirFechaTexto(rawInicio);
+                const periodoFin    = rawFin
+                ? convertirFechaTexto(rawFin)
+                : "A LA FECHA";
 
+               
                 if (institucion === "OTRA") {
                     adscripcion = "";
                     institucion = req.body[`experiencia_otrainst${i}`];
@@ -484,11 +638,16 @@ app.post('/guardar', upload.fields([
                     return new Date(parseInt(anio), parseInt(mes) - 1);
                 };
 
+                 const finOrden = rawFin
+                ? fechaOrdenable(rawFin)
+                : new Date(9999, 11, 31);
+
+
                 experiencias.push({
-                    inicioTexto: rawInicio,
-                    finTexto: rawFin,
+                    periodoInicio,
+                    periodoFin,
                     inicioOrden: fechaOrdenable(rawInicio),
-                    finOrden: fechaOrdenable(rawFin),
+                    finOrden,
                     institucion,
                     adscripcion,
                     puesto,
@@ -504,8 +663,8 @@ app.post('/guardar', upload.fields([
                     `INSERT INTO experienciapj (periodoInicio, periodoFin, institucion, adscripcion, cargo, campoExperiencia, idTrabajador)
                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [
-                        convertirFechaTexto(exp.inicioTexto),
-                        convertirFechaTexto(exp.finTexto),
+                        exp.periodoInicio,
+                        exp.periodoFin,
                         exp.institucion,
                         exp.adscripcion,
                         exp.puesto,
@@ -590,7 +749,7 @@ function calcularEdad(fechaNacimientoStr) {
 app.get('/reporte/:noTrabajador', async (req, res) => {
     const noTrabajador = req.params.noTrabajador;
     
-    const rutaPlantilla = './plantillas/CEDULA PERSONAL DATOS.xlsx';
+    const rutaPlantilla = './plantillas/curriculum.xlsx';
 
     try {
         
@@ -622,170 +781,559 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.readFile(rutaPlantilla);
-        const worksheet = workbook.getWorksheet(1); // Hoja 1
+        const worksheet = workbook.worksheets[0];
 
-        worksheet.getCell('F7').value = formatearFecha(trabajador.fechaIngreso);
-        worksheet.getCell('F8').value = trabajador.adscripcionActual;
-        worksheet.getCell('F9').value = trabajador.cargoActual;
-
-
-        worksheet.getCell('B11').value = trabajador.nombreTrabajador;
-        worksheet.getCell('B13').value = formatearFecha(trabajador.fechaNacimiento);
-        worksheet.getCell('B12').value = trabajador.lugarNacimiento;
-        worksheet.getCell('B14').value = trabajador.estadoCivil;
-        worksheet.getCell('B15').value = trabajador.tipoSangre;
-        worksheet.getCell('B16').value = trabajador.tipoCronica;
-
-        if (trabajador.nombreConyuge != "N/A"){
-            worksheet.getCell('A19').value = trabajador.nombreConyuge;
-            worksheet.getCell('C19').value = formatearFecha(trabajador.fechaNacimientoConyuge);///trabajador.fechaNacimientoConyuge ? trabajador.fechaNacimientoConyuge.toString() : '';
-            worksheet.getCell('D19').value = calcularEdad(trabajador.fechaNacimientoConyuge);
-            worksheet.getCell('E19').value = trabajador.sexoConyuge;
-        }
-        
-       
-        const direccionCompleta = `${trabajador.calleNumero}, ${trabajador.colonia}, ${trabajador.municipio}, ${trabajador.estado}, C.P. ${trabajador.codigoPostal}`;
-
-        worksheet.getCell('B36').value = direccionCompleta;
-
-        worksheet.getCell('B39').value = trabajador.noTelefono;
-        worksheet.getCell('B40').value = trabajador.telefonoCasa;
-        worksheet.getCell('B41').value = trabajador.telefonoFamiliar;
-        worksheet.getCell('F41').value = trabajador.parentescoFamiliar;
-        worksheet.getCell('B42').value = trabajador.correoElectronico;
-
-        worksheet.getCell('B47').value = trabajador.primaria;
-        worksheet.getCell('B48').value = trabajador.secundaria;
-        worksheet.getCell('B49').value = trabajador.carreraTecnicaComercial;
+        worksheet.getCell('B11').value = trabajador.primaria;
 
         const bachillerato = escolaridades.filter(
             exp => exp.nivelAcademico.toUpperCase() === "BACHILLERATO"
           );
-
         bachillerato.forEach((exp, index) => {
-            const fila = 51 + index; // Ejemplo: empieza en fila 40
+            const fila = 14 + index; // Empieza en la fila 14, 15, 16…
+            // Usando template literals con backticks:
             worksheet.getCell(`B${fila}`).value = exp.nombreTitulo;
             worksheet.getCell(`C${fila}`).value = exp.fechaObtencion;
             worksheet.getCell(`D${fila}`).value = exp.institucion;
             worksheet.getCell(`E${fila}`).value = exp.documentoAdquirido;
             worksheet.getCell(`F${fila}`).value = exp.estatus;
+            });
+
+        /*worksheet.duplicateRow(29,1, true);
+        worksheet.getCell("A30").value = "HOLAAA";
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+        ///////////////////////////////////////////////////
+
+
+        const UPDATE_ROW = 29;
+        const updateMerges = [];
+        worksheet.model.merges.forEach(range => {
+        const [start, end] = range.split(':');
+        const startRow = parseInt(start.match(/\d+$/)[0], 10);
+        const endRow   = parseInt(end  .match(/\d+$/)[0], 10);
+        if (startRow === UPDATE_ROW && endRow === UPDATE_ROW) {
+            updateMerges.push(range);
+        }
         });
 
-        /*const licenciatura = escolaridades.filter(
-            exp => exp.nivelAcademico.toUpperCase() === "LICENCIATURA"
-          );
+        const totalActualizaciones = actualizaciones.length;
+        if (totalActualizaciones > 1) {
+        worksheet.duplicateRow(UPDATE_ROW, totalActualizaciones - 1, true);
+        }
 
-          
+        
+        updateMerges.forEach(range => {
+        const [start, end] = range.split(':');
+        const colStart = start.match(/^[A-Z]+/)[0];
+        const colEnd   = end  .match(/^[A-Z]+/)[0];
+        for (let i = 1; i < totalActualizaciones; i++) {
 
-        licenciatura.forEach((exp, index) => {
-            const fila = 52 + index; // Ejemplo: empieza en fila 40
-            worksheet.getCell(`B${fila}`).value = exp.nombreTitulo;
-            worksheet.getCell(`C${fila}`).value = exp.fechaObtencion;
-            worksheet.getCell(`D${fila}`).value = exp.institucion;
-            worksheet.getCell(`E${fila}`).value = exp.documentoAdquirido;
-            worksheet.getCell(`F${fila}`).value = exp.estatus;
-            worksheet.getCell(`G${fila}`).value = exp.cedulaProfesional;
-        });*/
+            worksheet.mergeCells(`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+        }
+        });
 
-        const licenciaturas = escolaridades.filter(
-        exp => exp.nivelAcademico.toUpperCase() === "LICENCIATURA"
+        actualizaciones.forEach((exp, idx) => {
+        const r = UPDATE_ROW + idx;
+        worksheet.getCell(`A${r}`).value = exp.tema;
+        worksheet.getCell(`B${r}`).value = formatearFecha(exp.fecha);
+        worksheet.getCell(`C${r}`).value = exp.institucion;
+        worksheet.getCell(`E${r}`).value = exp.documento;
+        });
+
+        /////////////////////////////////
+        // justo después de leer el workbook y obtener worksheet…
+
+        const EXPERIENCE_ROW = 34;
+        const expMerges = [];
+        worksheet.model.merges.forEach(range => {
+        const [start, end] = range.split(':');
+        const startRow = +start.match(/\d+$/)[0];
+        const endRow   = +end  .match(/\d+$/)[0];
+        if (startRow === EXPERIENCE_ROW && endRow === EXPERIENCE_ROW) {
+            expMerges.push(range);
+        }
+        });
+
+        const experienciasPJ = experiencias
+        const totalExp = experienciasPJ.length;
+        if (totalExp > 1) {
+        worksheet.duplicateRow(EXPERIENCE_ROW, totalExp - 1, true);
+        }
+
+        expMerges.forEach(range => {
+        const [start, end] = range.split(':');
+        const colStart = start.match(/^[A-Z]+/)[0];
+        const colEnd   = end  .match(/^[A-Z]+/)[0];
+        for (let i = 1; i < totalExp; i++) {
+            worksheet.mergeCells(`${colStart}${EXPERIENCE_ROW + i}:${colEnd}${EXPERIENCE_ROW + i}`);
+        }
+        });
+
+        experienciasPJ.forEach((exp, idx) => {
+        const r = EXPERIENCE_ROW + idx;
+        worksheet.getCell(`A${r}`).value = exp.periodoInicio;
+        worksheet.getCell(`B${r}`).value = exp.periodoFin;
+        worksheet.getCell(`C${r}`).value = exp.institucion;
+        worksheet.getCell(`D${r}`).value = exp.cargo;
+        worksheet.getCell(`E${r}`).value = exp.campoExperiencia;
+        });
+
+
+
+
+
+
+        ///////////////////////////////////////////////////
+/*
+        const sobrantes = LIC_PLACEHOLDER_CNT - licenciaturas.length;
+        if (sobrantes > 0) {
+        // Empieza a borrar justo al final de tu último dato válido
+        worksheet.spliceRows(
+            LIC_START_ROW + licenciaturas.length,  // índice base-1 donde arrancas a borrar
+            sobrantes                               // cuántas filas borrar
         );
+        }*/
 
-        licenciaturas.forEach((exp, index) => {
-            const fila = 52 + index;
-            worksheet.getCell(`B${fila}`).value = exp.nombreTitulo;
-            worksheet.getCell(`C${fila}`).value = exp.fechaObtencion;
-            worksheet.getCell(`D${fila}`).value = exp.institucion;
-            worksheet.getCell(`E${fila}`).value = exp.documentoAdquirido;
-            worksheet.getCell(`F${fila}`).value = exp.estatus;
-            worksheet.getCell(`G${fila}`).value = exp.cedulaProfesional;    
+
+        const PREPA_START_ROW = 15;
+        const prepa = escolaridades.filter(e =>
+            e.nivelAcademico.toUpperCase() === "BACHILLERATO"
+        );
+        const prepaCount = prepa.length;
+
+
+        // 1) Si no hay ninguna, borramos la fila base
+        if (prepaCount === 0) {
+                const mergeRange = `B14:G14`;
+
+                try {
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet.mergeCells(mergeRange);
+                worksheet.getCell("B14").value= "No";
+                worksheet.getCell('B14').alignment = {
+                horizontal: 'center'
+                };
+
+        } else {
+            // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+            if (prepaCount > 1) {
+                // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                worksheet.duplicateRow(LIC_START_ROW, licCount - 1, true);
+            }
+
+            const start = PREPA_START_ROW;
+            const end = PREPA_START_ROW + prepaCount - 1;
+
+            // 3) Asignamos el encabezado en la primera fila
+            ///worksheet.getCell(`A${start}`).value = "hola";
+
+            /*
+            worksheet.getCell(`A${start}`).alignment = {
+              vertical:   "middle",
+              horizontal: "center",
+              wrapText:   true
+            };*/
+
+            // 4) Llenamos cada fila duplicada con los datos
+            prepa.forEach((exp, i) => {
+                const row = start + i;
+                worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+                worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+                worksheet.getCell(`D${row}`).value = exp.institucion;
+                worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+                worksheet.getCell(`F${row}`).value = exp.estatus;
+            });
+
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            if (prepaCount > 1) {
+                const mergeRange = `A${start}:A${end}`;
+                
+                try {
+                    // Intenta desfusionar (no lanza error si no existe)
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                    // Ignora el error si el merge no existe
+                }
+                
+                // Fusiona las celdas
+                worksheet.mergeCells(mergeRange);
+            }
+        }
+
+
+
+
+
+
+
+
+        
+        const LIC_START_ROW = 15;
+        const licenciaturas = escolaridades.filter(e =>
+            e.nivelAcademico.toUpperCase() === "LICENCIATURA"
+        );
+        const licCount = licenciaturas.length;
+
+        let acarreo = licCount;
+
+        console.log("acarreo lic: ", acarreo);
+        let licDesplazar = 15 + acarreo;
+
+        // 1) Si no hay ninguna, borramos la fila base
+        if (licCount === 0) {
+            const mergeRange = `B${licDesplazar}:G${licDesplazar}`;
+
+                try {
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet.mergeCells(mergeRange);
+
+                console.log("licdesplazar: ", licDesplazar)
+                worksheet.getCell(`B${licDesplazar}`).value= "No";
+                worksheet.getCell(`B${licDesplazar}`).alignment = {
+                horizontal: 'center'
+                }
+            ///worksheet.getRow(LIC_START_ROW).hidden = true;
+
+        } else {
+            // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+            if (licCount > 1) {
+                acarreo = acarreo - 1;
+                // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                worksheet.duplicateRow(LIC_START_ROW, licCount - 1, true);
+            }
+
+            const start = LIC_START_ROW;
+            const end = LIC_START_ROW + licCount - 1;
+
+            // 3) Asignamos el encabezado en la primera fila
+            ///worksheet.getCell(`A${start}`).value = "hola";
+
+            /*
+            worksheet.getCell(`A${start}`).alignment = {
+              vertical:   "middle",
+              horizontal: "center",
+              wrapText:   true
+            };*/
+
+            // 4) Llenamos cada fila duplicada con los datos
+            licenciaturas.forEach((exp, i) => {
+                const row = start + i;
+                worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+                worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+                worksheet.getCell(`D${row}`).value = exp.institucion;
+                worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+                worksheet.getCell(`F${row}`).value = exp.estatus;
+                worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
+            });
+
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            if (licCount > 1) {
+                const mergeRange = `A${start}:A${end}`;
+                
+                try {
+                    // Intenta desfusionar (no lanza error si no existe)
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                    // Ignora el error si el merge no existe
+                }
+                
+                // Fusiona las celdas
+                worksheet.mergeCells(mergeRange);
+            }
+        }
+
+
+
+
+
+
+
+        ////////////////////////////////////////////////////////////////////////
+
+
+        
+        const MAE_START_ROW = 16 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        const maestrias = escolaridades.filter(e =>
+        e.nivelAcademico.toUpperCase() === "MAESTRIA"
+        );
+        const maeCount = maestrias.length;
+        
+        
+
+        if (maeCount === 0) {
+            console.log("MAE " , MAE_START_ROW);
+
+            const mergeRange = `B${MAE_START_ROW}:G${MAE_START_ROW}`;
+
+                try {
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet.mergeCells(mergeRange);
+
+                worksheet.getCell(`B${MAE_START_ROW}`).value= "Sin maestria";
+                worksheet.getCell(`B${MAE_START_ROW}`).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+                
+            ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+        } else {
+        if (maeCount > 1) {
+            acarreo = acarreo + maeCount - 1;
+            worksheet.duplicateRow(MAE_START_ROW, maeCount - 1, true);
+        }
+
+        const start = MAE_START_ROW;
+
+        console.log ( start, " starto " , licDesplazar);
+        const end   = MAE_START_ROW + maeCount - 1;
+
+        // Encabezado en A (si lo necesitas)
+        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+        maestrias.forEach((exp, i) => {
+            const row = start + i;
+            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+            worksheet.getCell(`D${row}`).value = exp.institucion;
+            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+            worksheet.getCell(`F${row}`).value = exp.estatus;
+            worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
         });
-      
+
+        if (maeCount > 1) {
+            const mergeRange = `A${start}:A${end}`;
+            try { worksheet.unMergeCells(mergeRange); } catch (err) {}
+            try { worksheet.mergeCells(mergeRange);   } catch (err) {
+            console.warn(`No se pudo mergear ${mergeRange}:`, err);
+            }
+        }
+        }
 
 
-        const especialidad = escolaridades.filter(
-            exp => exp.nivelAcademico.toUpperCase() === "ESPECIALIDAD"
-          );
 
-        especialidad.forEach((exp, index) => {
-            const fila = 60 + index; // Ejemplo: empieza en fila 40
-            worksheet.getCell(`B${fila}`).value = exp.nombreTitulo;
-            worksheet.getCell(`C${fila}`).value = exp.fechaObtencion;
-            worksheet.getCell(`D${fila}`).value = exp.institucion;
-            worksheet.getCell(`E${fila}`).value = exp.documentoAdquirido;
-            worksheet.getCell(`F${fila}`).value = exp.estatus;
-            worksheet.getCell(`G${fila}`).value = exp.cedulaProfesional;
+
+
+
+
+        ///////////////////////////////////////////////
+
+        
+        console.log("acarreo mae: ", acarreo);
+
+        const DOC_START_ROW = 17 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        const doctorados = escolaridades.filter(e =>
+        e.nivelAcademico.toUpperCase() === "DOCTORADO"
+        );
+        const docCount = doctorados.length;
+        
+        
+
+        if (docCount === 0) {
+            console.log("DOC " , DOC_START_ROW);
+
+            
+            const mergeRange = `B${DOC_START_ROW}:G${DOC_START_ROW}`;
+            console.log("mergeRange: ",mergeRange);
+
+                try {
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet.mergeCells(mergeRange);
+
+                worksheet.getCell(`B${DOC_START_ROW}`).value= "Sin doctorado";
+                worksheet.getCell(`B${DOC_START_ROW}`).alignment = {
+                horizontal: 'center'
+                }
+            ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+        } else {
+        if (docCount > 1) {
+            acarreo = acarreo + docCount - 1;
+            worksheet.duplicateRow(DOC_START_ROW, docCount - 1, true);
+        }
+
+        const start = DOC_START_ROW;
+
+        const end   = DOC_START_ROW + docCount - 1;
+
+        // Encabezado en A (si lo necesitas)
+        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+        doctorados.forEach((exp, i) => {
+            const row = start + i;
+            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+            worksheet.getCell(`D${row}`).value = exp.institucion;
+            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+            worksheet.getCell(`F${row}`).value = exp.estatus;
+            worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
         });
 
-        const maestria = escolaridades.filter(
-            exp => exp.nivelAcademico.toUpperCase() === "MAESTRIA"
-          );
+        if (docCount > 1) {
+            const mergeRange = `A${start}:A${end}`;
+            try { worksheet.unMergeCells(mergeRange); } catch (err) {}
+            try { worksheet.mergeCells(mergeRange);   } catch (err) {
+            console.warn(`No se pudo mergear ${mergeRange}:`, err);
+            }
+        }
+    }
 
-        maestria.forEach((exp, index) => {
-            const fila = 55 + index; // Ejemplo: empieza en fila 40
-            worksheet.getCell(`B${fila}`).value = exp.nombreTitulo;
-            worksheet.getCell(`C${fila}`).value = exp.fechaObtencion;
-            worksheet.getCell(`D${fila}`).value = exp.institucion;
-            worksheet.getCell(`E${fila}`).value = exp.documentoAdquirido;
-            worksheet.getCell(`F${fila}`).value = exp.estatus;
-            worksheet.getCell(`G${fila}`).value = exp.cedulaProfesional;
+
+    console.log("acarreo doc: ", acarreo);
+
+        const ESP_START_ROW = 18 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        const especialidades = escolaridades.filter(e =>
+        e.nivelAcademico.toUpperCase() === "ESPECIALIDAD"
+        );
+        const espCount = especialidades.length;
+        
+        
+
+        if (espCount === 0) {
+            console.log("ESP " , ESP_START_ROW);
+
+            const mergeRange = `B${ESP_START_ROW}:G${ESP_START_ROW}`;
+            console.log("mergeRange: ",mergeRange);
+        
+                try {
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                
+                try {
+                    worksheet.mergeCells(mergeRange);
+                } catch (err) {
+                }
+                
+
+                worksheet.getCell(`B${ESP_START_ROW}`).value= "Sin especialidad";
+                worksheet.getCell(`B${ESP_START_ROW}`).alignment = {
+                horizontal: 'center'
+                }
+            ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+        } else {
+        if (espCount > 1) {
+            acarreo = acarreo + espCount - 1;
+            worksheet.duplicateRow(ESP_START_ROW, docCount - 1, true);
+        }
+
+        const start = ESP_START_ROW;
+
+        const end   = ESP_START_ROW + docCount - 1;
+
+        // Encabezado en A (si lo necesitas)
+        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+        especialidades.forEach((exp, i) => {
+            const row = start + i;
+            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+            worksheet.getCell(`D${row}`).value = exp.institucion;
+            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+            worksheet.getCell(`F${row}`).value = exp.estatus;
+            worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
         });
 
-        const doctorado = escolaridades.filter(
-            exp => exp.nivelAcademico.toUpperCase() === "DOCTORADO"
-          );
+        if (espCount > 1) {
+            const mergeRange = `A${start}:A${end}`;
+            try { worksheet.unMergeCells(mergeRange); } catch (err) {}
+            try { worksheet.mergeCells(mergeRange);   } catch (err) {
+            console.warn(`No se pudo mergear ${mergeRange}:`, err);
+            }
+        }
+    }
 
-        doctorado.forEach((exp, index) => {
-        const fila = 58 + index; // Ejemplo: empieza en fila 40
-        worksheet.getCell(`B${fila}`).value = exp.nombreTitulo;
-        worksheet.getCell(`C${fila}`).value = exp.fechaObtencion;
-        worksheet.getCell(`D${fila}`).value = exp.institucion;
-        worksheet.getCell(`E${fila}`).value = exp.documentoAdquirido;
-        worksheet.getCell(`F${fila}`).value = exp.estatus;
-        worksheet.getCell(`G${fila}`).value = exp.cedulaProfesional;
-        });
-     
+
+
+
 
         
 
-        // 👶 Hijos (hasta 10 como máximo)
-        hijos.forEach((hijo, index) => {
-            const fila = 23 + index; // Ejemplo: empieza en fila 20
-            worksheet.getCell(`A${fila}`).value = hijo.inicialesHijo;
-            worksheet.getCell(`C${fila}`).value = formatearFecha(hijo.fechaNacimientoHijo);
-            worksheet.getCell(`D${fila}`).value = hijo.edadHijo;
-            worksheet.getCell(`E${fila}`).value = hijo.sexoHijo;
-            
-            
-        });
 
-        actualizaciones.forEach((exp, index) => {
-            const fila = 69 + index; // Ejemplo: empieza en fila 40
-            worksheet.getCell(`A${fila}`).value = exp.tema;
-            worksheet.getCell(`B${fila}`).value = formatearFecha(exp.fecha);
-            worksheet.getCell(`C${fila}`).value = exp.institucion;
-            worksheet.getCell(`F${fila}`).value = exp.documento;
-        });
+        
 
-        const experienciasPJ = experiencias.filter(
-            exp => exp.institucion.toUpperCase() === "PODER JUDICIAL DEL ESTADO DE HIDALGO"
-          );
 
-        //  Experiencia PJ
-        experienciasPJ.forEach((exp, index) => {
-            const fila = 81 + index; // Ejemplo: empieza en fila 40
-            worksheet.getCell(`A${fila}`).value = exp.periodoInicio;
-            worksheet.getCell(`B${fila}`).value = exp.periodoFin;
-            worksheet.getCell(`C${fila}`).value = exp.adscripcion;
-            worksheet.getCell(`F${fila}`).value = exp.cargo;
-        });
-
-        // Guardar y enviar el archivo
+        
         const rutaSalida = './reportes/';
         const nombreArchivo = `cedula_${trabajador.noTrabajador}.xlsx`;
         const rutaCompleta = path.join(rutaSalida, nombreArchivo);
 
         await workbook.xlsx.writeFile(rutaCompleta);
+
+
+
+
+const workbook25 = new ExcelJS.Workbook();
+await workbook25.xlsx.readFile('./plantillas/25.xlsx');
+const ws25 = workbook25.getWorksheet(1); // O ajusta si es otra hoja
+
+// Ejemplo: Rellenar algunos campos en la plantilla 25
+ws25.getCell('B5').value = trabajador.nombreTrabajador;
+
+
+const licenciatura = escolaridades.find(
+  exp => exp.nivelAcademico.toUpperCase() === "LICENCIATURA"
+);
+
+if (licenciatura) {
+  ws25.getCell('C9').value = licenciatura.nombreTitulo;
+  ws25.getCell('D9').value = licenciatura.fechaObtencion;
+  ws25.getCell('E9').value = licenciatura.institucion;
+}
+
+const especialidad1 = escolaridades.find(
+  exp => exp.nivelAcademico.toUpperCase() === "ESPECIALIDAD"
+);
+
+if (especialidad1) {
+  ws25.getCell('C10').value = especialidad1.nombreTitulo;
+  ws25.getCell('D10').value = especialidad1.fechaObtencion;
+  ws25.getCell('E10').value = especialidad1.institucion;
+}
+
+actualizaciones.forEach((exp, index) => {
+            const fila = 14 + index; // Ejemplo: empieza en fila 40
+            ws25.getCell(`A${fila}`).value = exp.tema;
+            ws25.getCell(`B${fila}`).value = formatearFecha(exp.fecha);
+            ws25.getCell(`C${fila}`).value = exp.institucion;
+            ws25.getCell(`E${fila}`).value = exp.documento;
+        });
+
+
+experiencias.slice(0, 3).forEach((exp, index) => {
+    const fila = 25 + index;
+    ws25.getCell(`A${fila}`).value = exp.periodoInicio;
+    ws25.getCell(`B${fila}`).value = exp.periodoFin;
+    ws25.getCell(`C${fila}`).value = exp.institucion;
+
+    ws25.getCell(`D${fila}`).value = exp.cargo;
+    ws25.getCell(`E${fila}`).value = exp.campoExperiencia;
+});
+
+const nombreArchivo25 = `formato25_${trabajador.noTrabajador}.xlsx`;
+const rutaCompleta25 = path.join(rutaSalida, nombreArchivo25);
+await workbook25.xlsx.writeFile(rutaCompleta25);
+        
 
         const archiver = require('archiver');
 
@@ -801,8 +1349,9 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
                 if (err) {
                     console.error('Error al enviar ZIP:', err);
                 } else {
-                    fs.unlinkSync(zipRuta); // Limpieza después de enviar
-                    fs.unlinkSync(rutaCompleta); // Elimina el Excel temporal también
+                    fs.unlinkSync(zipRuta); 
+                    fs.unlinkSync(rutaCompleta); 
+                    fs.unlinkSync(rutaCompleta25); 
                 }
             });
         });
@@ -815,6 +1364,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
         // Adjunta el Excel generado
         archive.file(rutaCompleta, { name: path.basename(rutaCompleta) });
+        archive.file(rutaCompleta25, { name: path.basename(rutaCompleta25) });
 
         // Archivos PDF
         const uploadsPath = path.join(__dirname, 'uploads');
