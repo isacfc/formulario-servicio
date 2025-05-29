@@ -6,7 +6,8 @@ module.exports = {
     "./js/**/*.js"
   ],
   theme: {
-    extend: {colors:{verdegris: "#7C9383"},},
+    extend: {colors:{verdegris: "#738F81",amarilloPJ: '#ECD398',
+        grisTexto: '#585B5C'},},
   },
 
   safelist: [

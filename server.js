@@ -26,7 +26,8 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname);
     const noTrabajador = req.session?.user?.noTrabajador || 'desconocido';
-    const nombreLimpio = file.fieldname + '-' +noTrabajador + ext;
+    const nombreTrabajador = req.session?.user?.nombreTrabajador || 'desconocido';
+    const nombreLimpio = nombreTrabajador + '-' + file.fieldname   + ext;
     cb(null, nombreLimpio);
   }
 });
@@ -153,7 +154,8 @@ app.post('/guardar', upload.fields([
   { name: 'ine_pdf', maxCount: 1 },
   { name: 'acta_pdf', maxCount: 1 },
   { name: 'comprobante_domicilio_pdf', maxCount: 1 },
-  { name: 'comprobante_fiscal_pdf', maxCount: 1 }
+  { name: 'comprobante_fiscal_pdf', maxCount: 1},
+    {name: 'titulo_pdf', maxCount: 1}
 ]), async (req, res) => {
 
     if (!req.session.user) {
@@ -200,21 +202,40 @@ app.post('/guardar', upload.fields([
     let embarazada;
 
     
-    const comunidadIndigena = req.body.indigena === '1'
+    let comunidadIndigena = req.body.indigena === '1'
     ? req.body.comunidadIndigena?.trim().toUpperCase() || 'N/A'
     : 'N/A';
 
-    const familiaLinguistica = req.body.hablaLenguaIndigena === '1'
+
+    if (comunidadIndigena === "OTRO") {
+        comunidadIndigena = req.body.otraComunidad?.trim().toUpperCase() || "OTRO";
+    }
+
+    let familiaLinguistica = req.body.hablaLenguaIndigena === '1'
     ? req.body.familiaLinguistica?.trim().toUpperCase() || 'N/A'
     : 'N/A';
 
+
+    if (familiaLinguistica === "OTRA") {
+        familiaLinguistica = req.body.otraLengua?.trim().toUpperCase() || "OTRO";
+    }
     
-    const tipoDiscapacidad = req.body.discapacidad === '1'
-    ? req.body.tipoDiscapacidad?.trim().toUpperCase() || 'NO ESPECIFICADA'
-    : 'N/A';
+    let tipoDiscapacidad = req.body.discapacidad === '1'
+    ? req.body.tipoDiscapacidad?.trim().toUpperCase() || 'NO'
+    : 'No';
+
+
+    let discapacidadEspecificada = req.body.discapacidadTexto;
+
+    if (req.body.discapacidad === '0'){
+        discapacidadEspecificada = "N/A";
+
+    }
+
+
 
     ///let carreraTecnica = req.body.tecnica_institucion;
-
+    const vigenciaINE = req.body.vigenciaINE;
     const tieneTecnica = req.body.tieneTecnica === '1';
     const carreraTecnicaComercial = tieneTecnica
     ? req.body.tecnica_institucion.trim().toUpperCase()
@@ -237,8 +258,16 @@ app.post('/guardar', upload.fields([
     ? req.body.prepa_estatus
     : null;
 
+    let dominioLSM = req.body.nivelLSM;
 
-    const query = 'UPDATE trabajador SET  fechaIngreso=?, adscripcionActual=?,cargoActual=?,sexoTrabajador = ?,fechaNacimiento=?,lugarNacimiento=?,estadoCivil=?,nombreConyuge=?,fechaNacimientoConyuge=?,sexoConyuge=?,tipoSangre=?,calleNumero=?,colonia=?,municipio=?,estado=?,codigoPostal=?,actualCalleNumero=?,actualColonia=?,actualMunicipio=?,actualEstado=?, actualCP=?,  noTelefono = ?,telefonoCasa=?,telefonoFamiliar=?,parentescoFamiliar=?, correoElectronico=?,comunidadIndigena=?,familiaLinguistica=?,tipoDiscapacidad=?,lenguajeSenias=?,tieneEnfermedadCronica=?,tipoCronica=?, es_padre_madre=? , embarazada = ?, cantidadHijos = ?,primaria=?,secundaria=?, carreraTecnicaComercial=? WHERE idTrabajador = ?';
+    if (lenguaSenias === 'No') {
+        dominioLSM = "N/A";
+    }
+
+
+    
+
+    const query = 'UPDATE trabajador SET  fechaIngreso=?, adscripcionActual=?,cargoActual=?,sexoTrabajador = ?,fechaNacimiento=?,lugarNacimiento=?,estadoCivil=?,nombreConyuge=?,fechaNacimientoConyuge=?,sexoConyuge=?,tipoSangre=?,vigenciaINE=?,calleNumero=?,colonia=?,municipio=?,estado=?,codigoPostal=?,actualCalleNumero=?,actualColonia=?,actualMunicipio=?,actualEstado=?, actualCP=?,  noTelefono = ?,telefonoCasa=?,telefonoFamiliar=?,parentescoFamiliar=?, correoElectronico=?,comunidadIndigena=?,familiaLinguistica=?,tipoDiscapacidad=?,discapacidadEspecificada=?,lenguajeSenias=?,dominioLSM=?,tieneEnfermedadCronica=?,tipoCronica=?, es_padre_madre=? , embarazada = ?, cantidadHijos = ?,primaria=?,secundaria=?, carreraTecnicaComercial=? WHERE idTrabajador = ?';
     
     if ( papa == 1 && sexo == "Femenino"){
 
@@ -297,7 +326,7 @@ app.post('/guardar', upload.fields([
         const fechaFormateada = convertirFecha(fechaConyuge);
         const fechaIngresoFormateada = convertirFecha(fechaIngreso);
         const fechaNacimientoFormateada = convertirFecha(fechaNacimiento);
-        const [result] = await db.query(query, [fechaIngresoFormateada,adscripcionActual,cargoActual,sexo,fechaNacimientoFormateada,lugarNacimiento,civil,nombreConyuge,fechaFormateada,sexoConyuge,sangre,callenumero,colonia,municipio,estado,codigopostal,actualCallenumero,actualColonia, actualMunicipio, actualEstado, actualCP, telefono,telefonocasa,telefonofamiliar,parentesco,correo,comunidadIndigena,familiaLinguistica,tipoDiscapacidad,lenguaSenias,tieneCronica,cronicaTexto, padre, embarazada, cantidadHijos,primaria,secundaria_institucion, carreraTecnicaComercial, idTrabajador]);
+        const [result] = await db.query(query, [fechaIngresoFormateada,adscripcionActual,cargoActual,sexo,fechaNacimientoFormateada,lugarNacimiento,civil,nombreConyuge,fechaFormateada,sexoConyuge,sangre,vigenciaINE,callenumero,colonia,municipio,estado,codigopostal,actualCallenumero,actualColonia, actualMunicipio, actualEstado, actualCP, telefono,telefonocasa,telefonofamiliar,parentesco,correo,comunidadIndigena,familiaLinguistica,tipoDiscapacidad,discapacidadEspecificada,lenguaSenias,dominioLSM,tieneCronica,cronicaTexto, padre, embarazada, cantidadHijos,primaria,secundaria_institucion, carreraTecnicaComercial, idTrabajador]);
         console.log('✅ Actualización exitosa:', result);
 
 
@@ -782,8 +811,10 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.readFile(rutaPlantilla);
         const worksheet = workbook.worksheets[0];
-
+        worksheet.getCell('B7').value = trabajador.nombreTrabajador;
         worksheet.getCell('B11').value = trabajador.primaria;
+        worksheet.getCell('B12').value = trabajador.secundaria;
+        worksheet.getCell('B13').value = trabajador.carreraTecnicaComercial;
 
         const bachillerato = escolaridades.filter(
             exp => exp.nivelAcademico.toUpperCase() === "BACHILLERATO"
@@ -802,59 +833,10 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         worksheet.getCell("A30").value = "HOLAAA";
 */
 
+            ///////////////////////////////////////////////////////////
 
 
-
-
-
-
-
-
-
-
-
-        ///////////////////////////////////////////////////
-
-
-        const UPDATE_ROW = 29;
-        const updateMerges = [];
-        worksheet.model.merges.forEach(range => {
-        const [start, end] = range.split(':');
-        const startRow = parseInt(start.match(/\d+$/)[0], 10);
-        const endRow   = parseInt(end  .match(/\d+$/)[0], 10);
-        if (startRow === UPDATE_ROW && endRow === UPDATE_ROW) {
-            updateMerges.push(range);
-        }
-        });
-
-        const totalActualizaciones = actualizaciones.length;
-        if (totalActualizaciones > 1) {
-        worksheet.duplicateRow(UPDATE_ROW, totalActualizaciones - 1, true);
-        }
-
-        
-        updateMerges.forEach(range => {
-        const [start, end] = range.split(':');
-        const colStart = start.match(/^[A-Z]+/)[0];
-        const colEnd   = end  .match(/^[A-Z]+/)[0];
-        for (let i = 1; i < totalActualizaciones; i++) {
-
-            worksheet.mergeCells(`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
-        }
-        });
-
-        actualizaciones.forEach((exp, idx) => {
-        const r = UPDATE_ROW + idx;
-        worksheet.getCell(`A${r}`).value = exp.tema;
-        worksheet.getCell(`B${r}`).value = formatearFecha(exp.fecha);
-        worksheet.getCell(`C${r}`).value = exp.institucion;
-        worksheet.getCell(`E${r}`).value = exp.documento;
-        });
-
-        /////////////////////////////////
-        // justo después de leer el workbook y obtener worksheet…
-
-        const EXPERIENCE_ROW = 34;
+        const EXPERIENCE_ROW = 27;
         const expMerges = [];
         worksheet.model.merges.forEach(range => {
         const [start, end] = range.split(':');
@@ -889,6 +871,83 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         worksheet.getCell(`E${r}`).value = exp.campoExperiencia;
         });
 
+
+
+
+
+
+
+
+
+
+
+        ///////////////////////////////////////////////////
+
+
+        const UPDATE_ROW = 22;
+        const updateMerges = [];
+        
+        worksheet.model.merges.forEach(range => {
+        const [start, end] = range.split(':');
+        const startRow = parseInt(start.match(/\d+$/)[0], 10);
+        const endRow   = parseInt(end  .match(/\d+$/)[0], 10);
+        if (startRow === UPDATE_ROW && endRow === UPDATE_ROW) {
+            updateMerges.push(range);
+        }
+        });
+
+        const totalActualizaciones = actualizaciones.length;
+        if (totalActualizaciones > 1) {
+        worksheet.duplicateRow(UPDATE_ROW, totalActualizaciones - 1, true);
+        }
+
+        if(totalActualizaciones===0){
+            const mergeRange = `A22:E22`;
+
+                try {
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet.mergeCells(mergeRange);
+                worksheet.getCell("B22").value= "Sin Actualizaciones";
+                worksheet.getCell('B22').alignment = {
+                horizontal: 'center'
+                };
+
+        }
+
+        
+        updateMerges.forEach(range => {
+        const [start, end] = range.split(':');
+        const colStart = start.match(/^[A-Z]+/)[0];
+        const colEnd   = end  .match(/^[A-Z]+/)[0];
+        for (let i = 1; i < totalActualizaciones; i++) {
+            
+            console.log("rango de merge1: ",`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+            worksheet.mergeCells(`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+            
+        }
+        });
+
+        actualizaciones.forEach((exp, idx) => {
+        const r = UPDATE_ROW + idx;
+        worksheet.getCell(`A${r}`).value = exp.tema;
+        worksheet.getCell(`B${r}`).value = formatearFecha(exp.fecha);
+        worksheet.getCell(`C${r}`).value = exp.institucion;
+        worksheet.getCell(`D${r}`).value = exp.documento;
+        /*const mergeRange = `C${r}:D${r}`;
+        console.log(mergeRange);
+        try{
+        worksheet.mergeCells(mergeRange);
+        }catch(err){
+
+        }*/
+    });
+
+        /////////////////////////////////
+        // justo después de leer el workbook y obtener worksheet…
+
+        
 
 
 
@@ -987,7 +1046,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
             e.nivelAcademico.toUpperCase() === "LICENCIATURA"
         );
         const licCount = licenciaturas.length;
-
+        console.log("lenght lic:" , licCount);
         let acarreo = licCount;
 
         console.log("acarreo lic: ", acarreo);
@@ -1004,7 +1063,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
                 worksheet.mergeCells(mergeRange);
 
                 console.log("licdesplazar: ", licDesplazar)
-                worksheet.getCell(`B${licDesplazar}`).value= "No";
+                worksheet.getCell(`B${licDesplazar}`).value= "Sin licenciatura";
                 worksheet.getCell(`B${licDesplazar}`).alignment = {
                 horizontal: 'center'
                 }
@@ -1012,8 +1071,14 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
         } else {
             // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+
+            if(licCount === 1){
+                acarreo = acarreo - 1;
+            }
             if (licCount > 1) {
                 acarreo = acarreo - 1;
+
+                console.log("acarrero primero lic: " ,acarreo);
                 // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
                 worksheet.duplicateRow(LIC_START_ROW, licCount - 1, true);
             }
@@ -1282,7 +1347,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
 
 
-
+/*
 const workbook25 = new ExcelJS.Workbook();
 await workbook25.xlsx.readFile('./plantillas/25.xlsx');
 const ws25 = workbook25.getWorksheet(1); // O ajusta si es otra hoja
@@ -1333,7 +1398,7 @@ experiencias.slice(0, 3).forEach((exp, index) => {
 const nombreArchivo25 = `formato25_${trabajador.noTrabajador}.xlsx`;
 const rutaCompleta25 = path.join(rutaSalida, nombreArchivo25);
 await workbook25.xlsx.writeFile(rutaCompleta25);
-        
+        */
 
         const archiver = require('archiver');
 
@@ -1351,7 +1416,7 @@ await workbook25.xlsx.writeFile(rutaCompleta25);
                 } else {
                     fs.unlinkSync(zipRuta); 
                     fs.unlinkSync(rutaCompleta); 
-                    fs.unlinkSync(rutaCompleta25); 
+                    ///fs.unlinkSync(rutaCompleta25); 
                 }
             });
         });
@@ -1364,12 +1429,12 @@ await workbook25.xlsx.writeFile(rutaCompleta25);
 
         // Adjunta el Excel generado
         archive.file(rutaCompleta, { name: path.basename(rutaCompleta) });
-        archive.file(rutaCompleta25, { name: path.basename(rutaCompleta25) });
+        //archive.file(rutaCompleta25, { name: path.basename(rutaCompleta25) });
 
         // Archivos PDF
         const uploadsPath = path.join(__dirname, 'uploads');
         const pdfs = [
-            `ine_pdf-${trabajador.noTrabajador}.pdf`,
+            `${trabajador.nombreTrabajador}-ine_pdf.pdf`,
             `acta_pdf-${trabajador.noTrabajador}.pdf`,
             `comprobante_domicilio_pdf-${trabajador.noTrabajador}.pdf`,
             `comprobante_fiscal_pdf-${trabajador.noTrabajador}.pdf`

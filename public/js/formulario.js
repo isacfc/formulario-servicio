@@ -24,7 +24,37 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const fechaConyuge = document.getElementById("fechaConyuge");
 
-    
+    const telefonoInput = document.getElementById('noTelefono');
+
+    function check(e) {
+        tecla = (document.all) ? e.keyCode : e.which;
+
+        //Tecla de retroceso para borrar, siempre la permite
+        if (tecla == 8) {
+            return true;
+        }
+
+        // Patrón de entrada, en este caso solo acepta numeros y letras
+        patron = /[A-Za-z0-9]/;
+        tecla_final = String.fromCharCode(tecla);
+        return patron.test(tecla_final);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     function actualizarPreguntaEmbarazo() {
 
         const sexo = sexocombo.value
@@ -145,11 +175,20 @@ document.addEventListener("DOMContentLoaded", function() {
     
             // Iniciales label
             const labelIniciales = document.createElement("label");
-            labelIniciales.textContent = "Nombre completo empezando por apellidos de la hija o hijo (sin acentos):";
             labelIniciales.classList.add("block", "font-medium", "mb-1", "text-gray-700");
+
+            const spanRojo = document.createElement("span");
+            spanRojo.textContent = "Nombre completo";
+            spanRojo.style.color = "red";
+
+            labelIniciales.appendChild(spanRojo);
+
+            
+            labelIniciales.append(" empezando por apellidos de la hija o hijo (sin acentos):");
+
             divHijo.appendChild(labelIniciales);
     
-            // Iniciales input
+          
             const input = document.createElement("input");
             input.type = "text";
             input.name = "inicialesHijo" + i;
@@ -469,6 +508,46 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
 
+
+
+    const selectCom = document.getElementById('comunidadIndigena');
+    const otraComunidadContainer = document.getElementById('otraComunidadContainer');
+    const otraComunidadInput = document.getElementById('otraComunidadInput');
+
+    if (selectCom) {
+      selectCom.addEventListener('change', function () {
+        if (selectCom.value == "OTRO") {
+          otraComunidadContainer.classList.remove('hidden');
+          otraComunidadInput.setAttribute("required",true);
+        } else {
+          otraComunidadContainer.classList.add('hidden');
+          otraComunidadInput.value = ''; // limpiar campo si cambia
+          otraComunidadInput.removeAttribute("required");
+        }
+      });
+    }
+
+
+    
+
+    const selectFam = document.getElementById('familiaLinguistica');
+    const otraFamiliaContainer = document.getElementById('otraLenguaContainer');
+    const otraFamiliaInput = document.getElementById('otraLenguaInput');
+
+    if (selectFam) {
+      selectFam.addEventListener('change', function () {
+        if (selectFam.value == "OTRA") {
+          otraFamiliaContainer.classList.remove('hidden');
+          otraFamiliaInput.setAttribute("required",true);
+        } else {
+          otraFamiliaContainer.classList.add('hidden');
+          otraFamiliaInput.value = ''; // limpiar campo si cambia
+          otraFamiliaInput.removeAttribute("required");
+        }
+      });
+    }
+
+
     const radios = document.querySelectorAll('input[name="coincideDomicilio"]');
   const actualContainer = document.getElementById('domicilioActualContainer');
 
@@ -540,6 +619,25 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   });
 
+
+  const radiosLSM = document.getElementsByName("lenguaSenias");
+  const nivelContainer = document.getElementById("nivelLSMContainer");
+  const nivelSelect = document.getElementById("nivelLSM");
+
+  radiosLSM.forEach(radio => {
+    radio.addEventListener("change", function () {
+      if (this.value === "Sí") {
+        nivelContainer.classList.remove("hidden");
+        nivelSelect.setAttribute("required", true);
+      } else {
+        nivelContainer.classList.add("hidden");
+        nivelSelect.value = "";
+        nivelSelect.removeAttribute("required");
+      }
+    });
+  });
+
+
   const niveles = [
     { key: 'Licenciatura', max: 3 },
     { key: 'Maestria',     max: 3 },
@@ -605,7 +703,7 @@ const placeholders = {
                  required
                  class="border p-2 w-full rounded mb-2 acentos">
 
-          <label class="block mb-1">Fecha de obtención</label>
+          <label class="block mb-1">Fecha de obtención de grado</label>
           <input type="date"
                  name="${key.toLowerCase()}_fecha${i}"
                  required
@@ -613,14 +711,14 @@ const placeholders = {
                  data-format="dd-mm-yyyy"
                  class="border p-2 w-full rounded mb-2">
 
-          <label class="block mb-1">Institución</label>
+          <label class="block mb-1">Institución que expidió el título</label>
           <input type="text"
                  name="${key.toLowerCase()}_institucion${i}"
                  placeholder="${ph.institucion || ''}"
                  required
                  class="border p-2 w-full rounded mb-2 acentos">
 
-          <label class="block mb-1">Documento</label>
+          <label class="block mb-1">Documento adquirido</label>
           <select name="${key.toLowerCase()}_documento${i}"
                   required
                   class="border p-2 w-full rounded mb-2">
@@ -639,12 +737,12 @@ const placeholders = {
                   class="border p-2 w-full rounded mb-2">
             <option value="">Selecciona estatus</option>
             <option value="INCONCLUSO">INCONCLUSO</option>
-            <option value="EN CURSO">EN CURSO</option>
+            <option value="CURSANDO">CURSANDO</option>
             <option value="CONCLUIDO">CONCLUIDO</option>
             <option value="TITULADO">TITULADO</option>
           </select>
 
-          <label class="block mb-1">Cédula profesional</label>
+          <label class="block mb-1">Cédula profesional (Si no cuenta con una deje el campo vacio)</label>
           <input type="number"
                  name="${key.toLowerCase()}_cedula${i}"
                  placeholder="${ph.cedula || ''}"
@@ -771,7 +869,7 @@ div.innerHTML = `
 <input type="month" name="experiencia_fin${experienciaIndex}" id="experiencia_fin${experienciaIndex}" data-format="mm-yyyy" required class="border w-full p-2 rounded-md bg-gray-50"  placeholder="MM-AAAA">
 
 
-<input type="checkbox" name="experiencia_actual${experienciaIndex}" id="experiencia_actual${experienciaIndex}"> A LA FECHA </input>
+<input type="checkbox" name="experiencia_actual${experienciaIndex}" id="experiencia_actual${experienciaIndex}"> <span class="text-red-500"> A LA FECHA </span></input>
 
 <label class="block text-gray-700 font-semibold">Institución</label>
   <select name="experiencia_institucion${experienciaIndex}"
@@ -1136,6 +1234,9 @@ function validarActualizaciones(cantidadMaxima) {
   }
   return true;
 }
+
+
+
 
 
 
