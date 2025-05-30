@@ -368,10 +368,10 @@
 
     
     <div class="border border-gray-300 p-4 rounded-md my-4">
-    <label class="block text-xl font-bold text-gray-700 mb-2">Actualizar documento en PDF</label>
+    <label class="block text-xl font-bold text-blue-600 mb-2">Actualizar documento en PDF</label>
 
     <label class="block font-semibold text-gray-800 mb-1">Acta de nacimiento <span class="text-red-500 " >(2024 - a la fecha) </span></label>
-    <input type="file" name="acta_pdf" accept="application/pdf" class="mb-4" required>
+    <input type="file" name="ACTA-NACIMIENTO" accept="application/pdf" class="mb-4" required>
 
 
   
@@ -424,7 +424,7 @@
 
 
     <div class="my-4">
-      <label class="block mb-1 text-gray-700 font-bold">Correo Electronico <span class="text-red-500">(Autorizado para recepción de recibos de nomina y notificaciones)</span></label>
+      <label class="block mb-1 text-gray-700 font-bold">Correo Electronico <span class="text-red-500">(Autorizado para recepción de recibos de nomina, avisos y notificaciones)</span></label>
       <input type="text" class="border border-gray-300 w-full p-3 rounded-md bg-gray-50" name="correo"
         placeholder="Correo Electronico" required>
     </div>
@@ -434,7 +434,15 @@
     <div class="border border-gray-150 rounded-sm my-3 p-3">
       <label class="block mb-1 text-gray-700 font-bold">Domicilio conforme a credencial para votar</label>
 
+      <div class="border border-gray-300 p-4 rounded-md mt-4">
+      <label class="block text-xl font-bold text-blue-600 mb-2">Actualizar documento en PDF</label>
       
+    <label class="block font-semibold text-gray-800 mb-1">Credencial de elector (INE) vigente</label>
+    <input type="file" name="INE" accept="application/pdf" class="mb-4" required>
+
+        
+      </div>
+
       <div class="mb-3">
         <label class="block mb-1 text-gray-700 ">Vigencia de INE (Año Máximo de vigencia <span class="font-bold text-red-500"> mayor o igual a 2025)</span></label>
         <input type="text" class="acentos border border-gray-300 w-full p-3 rounded-md bg-gray-50 uppercase"
@@ -467,7 +475,7 @@
 
       <div class="mb-3">
         <label class="block mb-1 text-gray-700 ">Codigo Postal</label>
-        <input type="number" id="postal" class="border border-gray-300 w-full p-3 rounded-md bg-gray-50 uppercase"
+        <input type="text" id="postal" oninput="this.value = this.value.replace(/[^0-9]/,'')" maxlength="5" minlength="5" class="border border-gray-300 w-full p-3 rounded-md bg-gray-50 uppercase"
           name="codigopostal" placeholder="Codigo Postal" required>
         <span id="error-message2" style="color: red; display: none;">El C.P. debe tener exactamente 5 dígitos.</span>
 
@@ -503,6 +511,14 @@
 </div>
 
 
+  <div class="border border-gray-300 p-4 rounded-md mt-4">
+        <label class="block text-xl font-bold text-blue-600 mb-2">Actualizar documento en PDF</label>
+
+         
+    <label class="block font-semibold text-gray-800 mb-1">Comprobante de domicilio vigente</label>
+    <input type="file" name="COMPROBANTE-DOMICILIO" accept="application/pdf" class="mb-4" required>
+
+        </div>
 
 <!-- ¿Perteneces a comunidad indígena? -->
 <div class="mb-3">
@@ -731,6 +747,11 @@
       </div>
 
 
+      
+
+
+
+
       <div class="border my-4 mb-8 border-gray-150 rounded-sm hidden" id="datosConyuge">
       <label class="block mb-1 text-gray-700 font-bold ">Datos de pareja ó cónyuge</label>
 
@@ -762,7 +783,7 @@
 
         
     <div class="flex justify-center">
-      <label class="inline mb-4 font-bold text-verdegris text-center"> DATOS ACADEMICOS <br> (CURRICULUM VITE TRANSPARENCIA)</label>
+      <label class="inline mb-4 font-bold text-verdegris text-center"> -----------------DATOS ACADEMICOS----------------- <br> (CURRICULUM VITE TRANSPARENCIA)</label>
 
     </div>
     <!-- ESCOLARIDAD -->
@@ -927,12 +948,20 @@
         <div id="especialidadLista"></div>
       </div>
 
+
+      <div class="border border-gray-300 p-4 rounded-md mt-4">
+        <label class="block text-xl font-bold text-blue-600 mb-2">Actualizar documento en PDF</label>
+        <label class="block font-semibold text-gray-800 mb-1">Documentos de ultimos grados de estudios (Licenciaturas, Maestrias,doctorados, postdoctorados,especialidades) (Titulo y cedula, carta de pasante, certificado, constancia)</label>
+        <input type="file" name="GRADO-ESTUDIOS" accept="application/pdf" class="mb-4" required>
+
+      </div>
+
       
 
         
     </div>
     <div class="flex justify-center">
-      <label class="inline mt-4 font-bold text-verdegris text-center"> DATOS PROFESIONALES<br> (CURRICULUM VITAE)</label>
+      <label class="inline mt-4 font-bold text-verdegris text-center"> -----------------DATOS PROFESIONALES-----------------<br> (CURRICULUM VITAE)</label>
 
     </div>
     <div class="border border-gray-300 p-4 rounded-md mt-4">
@@ -966,27 +995,13 @@
 
     <input type="hidden" id="experienciaTotal" name="experienciaTotal" value="0">
 
-
     <div class="border border-gray-300 p-4 rounded-md mt-4">
-    <label class="block text-xl font-bold text-gray-700 mb-2">Actualizar documento en PDF</label>
-
-
-
-    <label class="block font-semibold text-gray-800 mb-1">Credencial de elector (INE) vigente</label>
-    <input type="file" name="ine_pdf" accept="application/pdf" class="mb-4" required>
-
-    <label class="block font-semibold text-gray-800 mb-1">Constancia de situación fiscal vigente</label>
-    <input type="file" name="comprobante_fiscal_pdf" accept="application/pdf" class="mb-4" required>
+        <label class="block text-xl font-bold text-blue-600 mb-2">Actualizar documento en PDF</label>
+        <label class="block font-semibold text-gray-800 mb-1">Constancia de situación fiscal vigente</label>
+        <input type="file" name="RFC" accept="application/pdf" class="mb-4" required>
   
-    
-    <label class="block font-semibold text-gray-800 mb-1">Comprobante de domicilio vigente</label>
-    <input type="file" name="comprobante_domicilio_pdf" accept="application/pdf" class="mb-4" required>
+      </div>
 
-
-    <label class="block font-semibold text-gray-800 mb-1">Documentos de ultimos grados de estudios (Licenciaturas, Maestrias,doctorados, postdoctorados,especialidades) (Titulo y cedula, carta de pasante, certificado, constancia)</label>
-    <input type="file" name="titulo_pdf" accept="application/pdf" class="mb-4" required>
-
-   </div>
 
 
 
@@ -1011,8 +1026,11 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
 
+
   <!-- JS -->
   <script src="/js/formulario.js"></script>
+
+  
 
 </body>
 

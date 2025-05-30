@@ -428,8 +428,56 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         
         if (valido) {
-          botonFormulario.disabled = true;
-          botonFormulario.textContent = "Enviando...";
+          event.preventDefault();
+
+          const aceptado = confirm(`AVISO DE PRIVACIDAD
+              Plataforma de Actualización de Datos Personales del Personal del Poder Judicial del Estado de Hidalgo
+
+¿Quién es el responsable del tratamiento de sus datos personales? 
+El Poder Judicial del Estado de Hidalgo, a través de la Dirección de Recursos Humanos del Consejo de la Judicatura ubicada en el kilómetro 84.5, Carretera México Pachuca, Sector Primario, C.P. 42080 Pachuca de Soto, Hidalgo. 
+
+¿Qué datos personales recabamos y para que finalidad? 
+Los datos personales son recabados para las siguientes finalidades: 
+Actualizar el expediente físico y la base de datos, de los trabajadores del Poder Judicial.
+Generar reportes.
+Elaborar reportes estadísticos en los que los datos serán tratados de forma disociada.
+Dar trámite a solicitudes de información.
+
+
+Los datos personales que se recaban para las finalidades antes señaladas son: 
+1. Datos identificativos: Nombre, lugar y fecha de nacimiento, sexo, Clave Única de Registro de Población (CURP), RFC, estado civil, nombre de cónyuge, nombre, sexo, fecha de nacimiento y edad de descendientes en primer grado, acta de nacimiento, domicilios, código postal, números telefónicos personales y de casa, nombre y número telefónico de un familiar, correo electrónico;
+2. Datos académicos: Grados de estudios profesionales, título profesional, cédula profesional, certificados, constancias de estudios, fecha de obtención de documento académico y actualización academica; 
+3. Datos laborales: Número de empleado, nombramiento o designación de cargo, fecha de alta en el cargo, número de seguridad social, experiencia laboral, actas y procedimientos de responsabilidades y curriculum vitae; 
+4. Datos patrimoniales: Registro Federal de Contribuyente (RFC), actividad económica y régimen fiscal en cédulas del RFC; 
+5. Datos biométricos: grupo sanguíneo. 
+
+
+¿Cuál es el fundamento legal que permite recabar dichos datos personales? 
+La Dirección de Recursos Humanos está facultada para tratar los datos personales relacionados con los asuntos de su competencia de conformidad con las atribuciones que le confiere la Ley Orgánica del Poder Judicial del Estado de Hidalgo en su artículo 142, fracción I y Ley de Protección de Datos Personales en Posesión de Sujetos Obligados para el Estado de Hidalgo en sus artículos 12 y 15. 
+¿Con quién se comparten los datos personales? 
+La Dirección de Recursos Humanos puede realizar transferencias con el Servicio de Administración Tributaria (SAT), Instituto de Seguridad y Servicios Sociales de los Trabajadores del Estado (ISSSTE), Fondo de la Vivienda del Instituto de Seguridad y Servicios Sociales de los Trabajadores del Estado (FOVISSSTE), Auditoria Superior de la Federación (ASF), Auditoria Superior del Estado de Hidalgo (ASEH), Gobierno del Estado de Hidalgo, y aquellas que sean necesarias para cumplir con lo dispuesto en materia de transparencia, acceso a la información pública y protección de datos personales, así como para atender solicitudes o requerimientos realizados por autoridades competentes, de conformidad con los artículos 19, 98 y 99 de la Ley de Protección de Datos Personales en Posesión de Sujetos Obligados para el Estado de Hidalgo, en las que no se requerirá de su consentimiento. 
+
+
+¿Dónde puedo ejercer los derechos de acceso, rectificación, cancelación y oposición? 
+Los derechos de acceso, rectificación, cancelación y oposición de sus datos personales (Derechos ARCO) que se encuentran en posesión del Poder Judicial del Estado de Hidalgo, podrán ejercerse a través de los siguientes medios: 
+1. Directamente en el domicilio de la Unidad de Transparencia del Poder Judicial sito en Carretera México - Pachuca km. 84.5 Centro Cívico, Sector Primario, C.P. 42080, Pachuca de Soto, Hidalgo. 
+2. Por escrito dirigido a la Unidad de Transparencia del Poder Judicial 
+3. Por internet a través de la Plataforma Nacional de Transparencia en el siguiente enlace: https://www.plataformadetransparencia.org.mx/group/guest/sisai_solicitudes#/datospersonales 
+4. Por correo electrónico a la cuenta de la Unidad de Transparencia del Poder Judicial, en la siguiente dirección: transparencia@pjhidalgo.gob.mx
+
+
+Si desea más información sobre como ejercer sus derechos ARCO, favor de comunicarse a la Unidad de Transparencia del Poder Judicial al 771 7179000 extensión 9546. 
+¿Dónde puedo consultar el aviso de privacidad y por qué medios se comunican a los titulares de los datos personales los cambios realizados? 
+El presente aviso de privacidad está sujeto a modificaciones, cambios o actualizaciones derivadas de causas diversas como lo pueden ser nuevos requerimientos legales, cambios de domicilio o medios de contacto, lo cual se informará a través de la página de internet www.pjhidalgo.gob.mx 
+Lo anterior en cumplimiento a lo dispuesto en los artículos 67 fracción III de la Ley de Transparencia y Acceso a la Información Pública del Estado de Hidalgo; 3 fracción I, II, VII, VIII, IX, XXXV,19, 24, 34, 35, 36, 37, 39 y 42 de la Ley de Protección de Datos Personales en Posesión de Sujetos Obligados para el Estado de Hidalgo.
+
+          ¿Deseas continuar y enviar tu información?`);
+
+              if (aceptado) {
+                botonFormulario.disabled = true;
+                botonFormulario.textContent = "Enviando...";
+                form.submit(); // ✅ Solo se envía si se acepta
+              }
         }
     });
 
@@ -697,6 +745,8 @@ const placeholders = {
           <p class="font-semibold mb-2">${key} ${i}</p>
 
           <label class="block mb-1">Nombre del título</label>
+
+          <label class="block mb-1 text-red-500">Si te encuentras cursando colocar el semestre, cuatrimestre o bimestre</label>
           <input type="text"
                  name="${key.toLowerCase()}_titulo${i}"
                  placeholder="${ph.titulo || ''}"

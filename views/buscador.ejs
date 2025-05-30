@@ -31,7 +31,17 @@
     </div>
 
     <button type="submit" class="bg-verdegris hover:opacity-90 text-white py-3 rounded-md text-lg font-semibold transition">Buscar</button>
-  </form>
+
+
+    </form>
+<form onsubmit="descargarTodos(event)">
+<button a href="/generar-reporte-todos"  class="bg-verdegris hover:opacity-90 text-white py-3 rounded-md text-lg font-semibold transition">Descargar todo</button>
+  <p id="mensajeProgreso" class="text-center text-gray-700 italic mt-2"></p>
+
+
+</form>
+
+    
 
   <p class="italic text-green-800 font-medium text-xl mx-auto mt-4">Elaborado por José Isac Frausto Cadena.</p>
 
@@ -64,6 +74,44 @@
       }
     }
   </script>
+<script>
+  async function descargarTodos(event) {
+    event.preventDefault();
+    const boton = event.target;
+    const mensaje = document.getElementById('mensajeProgreso');
+
+    boton.disabled = true;
+    boton.innerText = 'Generando ZIP...';
+    mensaje.innerText = 'Por favor espera, estamos generando todos los reportes. Esto puede tardar unos minutos...';
+
+    try {
+      const response = await fetch('/generar-reportes-todos');
+
+      if (!response.ok) throw new Error("Error al generar el archivo.");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "REPORTE_GENERAL.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      mensaje.innerText = 'ZIP generado con éxito. La descarga debería comenzar automáticamente.';
+
+    } catch (error) {
+      mensaje.innerText = 'Hubo un problema al generar el ZIP.';
+      console.error(error);
+    } finally {
+      boton.disabled = true;
+      boton.innerText = 'Se ha descargado el zip general';
+    }
+  }
+</script>
+
 
 </body>
 

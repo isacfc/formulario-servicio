@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser'); // Leer y entender los datos del formulario
 const db = require('./config/db'); // Ahora es el pool
-
+const XLSX = require('xlsx');
 const app = express(); //Crear una aplicación express
 const ExcelJS = require('exceljs');
 const fs = require('fs');
@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
     const ext = path.extname(file.originalname);
     const noTrabajador = req.session?.user?.noTrabajador || 'desconocido';
     const nombreTrabajador = req.session?.user?.nombreTrabajador || 'desconocido';
-    const nombreLimpio = nombreTrabajador + '-' + file.fieldname   + ext;
+    const nombreLimpio = nombreTrabajador + '_' + file.fieldname   + ext;
     cb(null, nombreLimpio);
   }
 });
@@ -51,7 +51,93 @@ app.use(session({
 
 
 
+app.get('/acuse/:noTrabajador', async (req, res) => {
+  const { noTrabajador } = req.params;
 
+  try {
+    const connection = await db.getConnection();
+
+    const [[trabajador]] = await connection.query(
+      "SELECT * FROM trabajador WHERE noTrabajador = ?", [noTrabajador]
+    );
+
+    const [hijos] = await connection.query(
+      "SELECT * FROM hijo WHERE idTrabajador = ?", [trabajador.idTrabajador]
+    );
+
+    const [escolaridad] = await connection.query(
+      "SELECT * FROM escolaridad WHERE idTrabajador = ?", [trabajador.idTrabajador]
+    );
+
+    const [experienciaPJ] = await connection.query(
+      "SELECT * FROM experienciaPJ WHERE idTrabajador = ?", [trabajador.idTrabajador]
+    );
+
+    const [actualizacion] = await connection.query(
+      "SELECT * FROM actualizacionprofesional WHERE idTrabajador = ?", [trabajador.idTrabajador]
+    );
+
+    connection.release();
+
+    res.render('acuse', {
+      trabajador,
+      hijos,
+      escolaridad,
+      experienciaPJ,
+      actualizacion
+    });
+  } catch (error) {
+    console.error("Error en /acuse:", error);
+    res.status(500).send("Error interno al generar el acuse");
+  }
+});
+
+
+
+const puppeteer = require('puppeteer');
+
+const ejs = require('ejs');
+
+app.get('/acuse-pdf/:noTrabajador', async (req, res) => {
+  const { noTrabajador } = req.params;
+
+  try {
+    // 1. Conecta y extrae datos
+    const connection = await db.getConnection();
+    const [rows] = await connection.query("SELECT * FROM trabajador WHERE noTrabajador = ?", [noTrabajador]);
+    connection.release();
+
+    if (!rows.length) return res.status(404).send("Trabajador no encontrado");
+    const trabajador = rows[0];
+
+    // 2. Renderiza el HTML con EJS (en lugar de navegar a una URL)
+    const filePath = path.join(__dirname, 'views', 'acuse.ejs');
+    const html = await ejs.renderFile(filePath, { trabajador });
+
+    // 3. Genera el PDF desde ese HTML
+    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const pdfBuffer = await page.pdf({
+      format: 'letter',
+      printBackground: true,
+      margin: { top: '1in', bottom: '1in', left: '1in', right: '1in' }
+    });
+
+    await browser.close();
+
+    // 4. Enviar PDF como descarga
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=acuse_${noTrabajador}.pdf`,
+    });
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error("Error generando PDF:", err);
+    res.status(500).send("Error interno al generar PDF");
+  }
+});
 
 
 app.get('/login', (req, res) => {
@@ -151,11 +237,11 @@ function mesAnioAFechaOrdenable(fechaMMYYYY) {
 // Ruta para guardar datos
 
 app.post('/guardar', upload.fields([
-  { name: 'ine_pdf', maxCount: 1 },
-  { name: 'acta_pdf', maxCount: 1 },
-  { name: 'comprobante_domicilio_pdf', maxCount: 1 },
-  { name: 'comprobante_fiscal_pdf', maxCount: 1},
-    {name: 'titulo_pdf', maxCount: 1}
+  { name: 'INE', maxCount: 1 },
+  { name: 'ACTA-NACIMIENTO', maxCount: 1 },
+  { name: 'COMPROBANTE-DOMICILIO', maxCount: 1 },
+  { name: 'RFC', maxCount: 1},
+    {name: 'GRADO-ESTUDIOS', maxCount: 1}
 ]), async (req, res) => {
 
     if (!req.session.user) {
@@ -169,7 +255,7 @@ app.post('/guardar', upload.fields([
 
 
     const { telefono,fechaIngreso,adscripcionActual, lenguaSenias,sexo,fechaNacimiento,municipioNacimiento,estadoNacimiento,codigopostal,correo, papa, embarazo,  cantidadHijos, cronica,civil,sangre,telefonocasa,telefonofamiliar,parentesco,primaria,secundaria_institucion } = req.body;
-    const { idTrabajador } = req.session.user;
+    const { idTrabajador, noTrabajador } = req.session.user;
 
     const lugarNacimiento = `${municipioNacimiento.trim().toUpperCase()}, ${estadoNacimiento.trim().toUpperCase()}`;
 
@@ -385,7 +471,7 @@ app.post('/guardar', upload.fields([
         await db.query(insertQuery, [
             "BACHILLERATO",
             req.body.prepa_titulo.trim().toUpperCase(),
-            convertirFecha(req.body.prepa_fecha),
+            req.body.prepa_fecha,
             req.body.prepa_institucion.trim().toUpperCase(),
             req.body.prepa_documento,
             req.body.prepa_estatus,
@@ -709,7 +795,7 @@ app.post('/guardar', upload.fields([
         // Destruir la sesión y redirigir
         req.session.destroy(() => {
             console.log("✅ Sesión destruida");
-            res.redirect('/success');
+            res.redirect(`/acuse/${noTrabajador}`);
         });
 
     } catch (err) {
@@ -836,7 +922,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
             ///////////////////////////////////////////////////////////
 
 
-        const EXPERIENCE_ROW = 27;
+        const EXPERIENCE_ROW = 26;
         const expMerges = [];
         worksheet.model.merges.forEach(range => {
         const [start, end] = range.split(':');
@@ -849,6 +935,21 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
         const experienciasPJ = experiencias
         const totalExp = experienciasPJ.length;
+
+        if(totalExp===0){
+            const mergeRange = `A26:D26`;
+
+                try {
+                    worksheet.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet.mergeCells(mergeRange);
+                worksheet.getCell("A26").value= "Sin Experiencias";
+                worksheet.getCell('A26').alignment = {
+                horizontal: 'center'
+                };
+
+        }
         if (totalExp > 1) {
         worksheet.duplicateRow(EXPERIENCE_ROW, totalExp - 1, true);
         }
@@ -863,10 +964,11 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         });
 
         experienciasPJ.forEach((exp, idx) => {
+            
         const r = EXPERIENCE_ROW + idx;
         worksheet.getCell(`A${r}`).value = exp.periodoInicio;
         worksheet.getCell(`B${r}`).value = exp.periodoFin;
-        worksheet.getCell(`C${r}`).value = exp.institucion;
+        worksheet.getCell(`C${r}`).value = exp.institucion + " / " + exp.adscripcion;
         worksheet.getCell(`D${r}`).value = exp.cargo;
         worksheet.getCell(`E${r}`).value = exp.campoExperiencia;
         });
@@ -902,7 +1004,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         }
 
         if(totalActualizaciones===0){
-            const mergeRange = `A22:E22`;
+            const mergeRange = `A22:D22`;
 
                 try {
                     worksheet.unMergeCells(mergeRange);
@@ -944,28 +1046,9 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         }*/
     });
 
-        /////////////////////////////////
-        // justo después de leer el workbook y obtener worksheet…
+     
 
-        
-
-
-
-
-
-        ///////////////////////////////////////////////////
-/*
-        const sobrantes = LIC_PLACEHOLDER_CNT - licenciaturas.length;
-        if (sobrantes > 0) {
-        // Empieza a borrar justo al final de tu último dato válido
-        worksheet.spliceRows(
-            LIC_START_ROW + licenciaturas.length,  // índice base-1 donde arrancas a borrar
-            sobrantes                               // cuántas filas borrar
-        );
-        }*/
-
-
-        const PREPA_START_ROW = 15;
+        const PREPA_START_ROW = 14;
         const prepa = escolaridades.filter(e =>
             e.nivelAcademico.toUpperCase() === "BACHILLERATO"
         );
@@ -985,6 +1068,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
                 worksheet.getCell('B14').alignment = {
                 horizontal: 'center'
                 };
+                 worksheet.getRow(PREPA_START_ROW).hidden = true;
 
         } else {
             // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
@@ -1041,11 +1125,11 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
 
         
-        const LIC_START_ROW = 15;
+        let LIC_START_ROW = 15;
         const licenciaturas = escolaridades.filter(e =>
             e.nivelAcademico.toUpperCase() === "LICENCIATURA"
         );
-        const licCount = licenciaturas.length;
+        let licCount = licenciaturas.length;
         console.log("lenght lic:" , licCount);
         let acarreo = licCount;
 
@@ -1067,7 +1151,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
                 worksheet.getCell(`B${licDesplazar}`).alignment = {
                 horizontal: 'center'
                 }
-            ///worksheet.getRow(LIC_START_ROW).hidden = true;
+                worksheet.getRow(LIC_START_ROW).hidden = true;
 
         } else {
             // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
@@ -1134,11 +1218,11 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
 
         
-        const MAE_START_ROW = 16 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        let MAE_START_ROW = 16 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
         const maestrias = escolaridades.filter(e =>
         e.nivelAcademico.toUpperCase() === "MAESTRIA"
         );
-        const maeCount = maestrias.length;
+        let maeCount = maestrias.length;
         
         
 
@@ -1155,7 +1239,7 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
                 worksheet.getCell(`B${MAE_START_ROW}`).value= "Sin maestria";
                 worksheet.getCell(`B${MAE_START_ROW}`).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-
+                worksheet.getRow(MAE_START_ROW).hidden = true;
                 
             ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
         } else {
@@ -1203,11 +1287,11 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
         
         console.log("acarreo mae: ", acarreo);
 
-        const DOC_START_ROW = 17 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        let DOC_START_ROW = 17 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
         const doctorados = escolaridades.filter(e =>
         e.nivelAcademico.toUpperCase() === "DOCTORADO"
         );
-        const docCount = doctorados.length;
+        let docCount = doctorados.length;
         
         
 
@@ -1228,6 +1312,8 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
                 worksheet.getCell(`B${DOC_START_ROW}`).alignment = {
                 horizontal: 'center'
                 }
+
+                worksheet.getRow(DOC_START_ROW).hidden = true;
             ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
         } else {
         if (docCount > 1) {
@@ -1265,11 +1351,11 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
     console.log("acarreo doc: ", acarreo);
 
-        const ESP_START_ROW = 18 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        let ESP_START_ROW = 18 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
         const especialidades = escolaridades.filter(e =>
         e.nivelAcademico.toUpperCase() === "ESPECIALIDAD"
         );
-        const espCount = especialidades.length;
+        let espCount = especialidades.length;
         
         
 
@@ -1294,6 +1380,10 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
                 worksheet.getCell(`B${ESP_START_ROW}`).alignment = {
                 horizontal: 'center'
                 }
+
+                worksheet.getRow(ESP_START_ROW).hidden = true;
+
+                
             ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
         } else {
         if (espCount > 1) {
@@ -1340,70 +1430,577 @@ app.get('/reporte/:noTrabajador', async (req, res) => {
 
         
         const rutaSalida = './reportes/';
-        const nombreArchivo = `cedula_${trabajador.noTrabajador}.xlsx`;
+        const nombreArchivo = `${trabajador.nombreTrabajador}_CURRICULUM-EDITABLE.xlsx`;
         const rutaCompleta = path.join(rutaSalida, nombreArchivo);
 
         await workbook.xlsx.writeFile(rutaCompleta);
 
 
 
-/*
-const workbook25 = new ExcelJS.Workbook();
-await workbook25.xlsx.readFile('./plantillas/25.xlsx');
-const ws25 = workbook25.getWorksheet(1); // O ajusta si es otra hoja
 
-// Ejemplo: Rellenar algunos campos en la plantilla 25
-ws25.getCell('B5').value = trabajador.nombreTrabajador;
+        ////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////
+
+        
+
+    const rutaPlantilla2 = './plantillas/curriculum2.xlsx';
+
+        const workbook2 = new ExcelJS.Workbook();
+        await workbook2.xlsx.readFile(rutaPlantilla2);
+        const worksheet2 = workbook2.worksheets[0];
+        
+        worksheet2.getCell('B7').value = trabajador.nombreTrabajador;
+        worksheet2.getCell('B11').value = trabajador.primaria;
+        worksheet2.getCell('B12').value = trabajador.secundaria;
+        worksheet2.getCell('B13').value = trabajador.carreraTecnicaComercial;
+
+        
+        bachillerato.forEach((exp, index) => {
+            const fila = 14 + index; // Empieza en la fila 14, 15, 16…
+            // Usando template literals con backticks:
+            worksheet2.getCell(`B${fila}`).value = exp.nombreTitulo;
+            worksheet2.getCell(`C${fila}`).value = exp.fechaObtencion;
+            worksheet2.getCell(`D${fila}`).value = exp.institucion;
+            });
+
+        /*worksheet.duplicateRow(29,1, true);
+        worksheet.getCell("A30").value = "HOLAAA";
+*/
+
+            ///////////////////////////////////////////////////////////
 
 
-const licenciatura = escolaridades.find(
-  exp => exp.nivelAcademico.toUpperCase() === "LICENCIATURA"
-);
+        
+        worksheet2.model.merges.forEach(range => {
+        const [start, end] = range.split(':');
+        const startRow = +start.match(/\d+$/)[0];
+        const endRow   = +end  .match(/\d+$/)[0];
+        if (startRow === EXPERIENCE_ROW && endRow === EXPERIENCE_ROW) {
+            expMerges.push(range);
+        }
+        });
 
-if (licenciatura) {
-  ws25.getCell('C9').value = licenciatura.nombreTitulo;
-  ws25.getCell('D9').value = licenciatura.fechaObtencion;
-  ws25.getCell('E9').value = licenciatura.institucion;
-}
+        
 
-const especialidad1 = escolaridades.find(
-  exp => exp.nivelAcademico.toUpperCase() === "ESPECIALIDAD"
-);
 
-if (especialidad1) {
-  ws25.getCell('C10').value = especialidad1.nombreTitulo;
-  ws25.getCell('D10').value = especialidad1.fechaObtencion;
-  ws25.getCell('E10').value = especialidad1.institucion;
-}
+        if(totalExp===0){
+            const mergeRange = `A26:E26`;
 
-actualizaciones.forEach((exp, index) => {
-            const fila = 14 + index; // Ejemplo: empieza en fila 40
-            ws25.getCell(`A${fila}`).value = exp.tema;
-            ws25.getCell(`B${fila}`).value = formatearFecha(exp.fecha);
-            ws25.getCell(`C${fila}`).value = exp.institucion;
-            ws25.getCell(`E${fila}`).value = exp.documento;
+                try {
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet2.mergeCells(mergeRange);
+                worksheet2.getCell("A26").value= "Sin Experiencias";
+                worksheet2.getCell('A26').alignment = {
+                horizontal: 'center'
+                };
+
+        }
+        if (totalExp > 1) {
+        worksheet2.duplicateRow(EXPERIENCE_ROW, totalExp - 1, true);
+        }
+
+        expMerges.forEach(range => {
+        const [start, end] = range.split(':');
+        const colStart = start.match(/^[A-Z]+/)[0];
+        const colEnd   = end  .match(/^[A-Z]+/)[0];
+        for (let i = 1; i < totalExp; i++) {
+            worksheet2.mergeCells(`${colStart}${EXPERIENCE_ROW + i}:${colEnd}${EXPERIENCE_ROW + i}`);
+        }
+        });
+
+        experienciasPJ.forEach((exp, idx) => {
+            
+        const r = EXPERIENCE_ROW + idx;
+        worksheet2.getCell(`A${r}`).value = exp.periodoInicio;
+        worksheet2.getCell(`B${r}`).value = exp.periodoFin;
+        worksheet2.getCell(`C${r}`).value = exp.institucion;
+
+        if (worksheet2.getCell(`C${r}`).value == "PODER JUDICIAL DEL ESTADO DE HIDALGO"){
+            worksheet2.getCell(`C${r}`).value = exp.institucion + "/" + exp.adscripcion;
+        }
+        worksheet2.getCell(`D${r}`).value = exp.cargo;
+        worksheet2.getCell(`E${r}`).value = exp.campoExperiencia;
         });
 
 
-experiencias.slice(0, 3).forEach((exp, index) => {
-    const fila = 25 + index;
-    ws25.getCell(`A${fila}`).value = exp.periodoInicio;
-    ws25.getCell(`B${fila}`).value = exp.periodoFin;
-    ws25.getCell(`C${fila}`).value = exp.institucion;
 
-    ws25.getCell(`D${fila}`).value = exp.cargo;
-    ws25.getCell(`E${fila}`).value = exp.campoExperiencia;
-});
 
-const nombreArchivo25 = `formato25_${trabajador.noTrabajador}.xlsx`;
-const rutaCompleta25 = path.join(rutaSalida, nombreArchivo25);
-await workbook25.xlsx.writeFile(rutaCompleta25);
-        */
+
+
+
+
+
+
+
+        ///////////////////////////////////////////////////
+
+
+        
+        worksheet2.model.merges.forEach(range => {
+        const [start, end] = range.split(':');
+        const startRow = parseInt(start.match(/\d+$/)[0], 10);
+        const endRow   = parseInt(end  .match(/\d+$/)[0], 10);
+        if (startRow === UPDATE_ROW && endRow === UPDATE_ROW) {
+            updateMerges.push(range);
+        }
+        });
+
+        if (totalActualizaciones > 1) {
+        worksheet2.duplicateRow(UPDATE_ROW, totalActualizaciones - 1, true);
+        }
+
+        if(totalActualizaciones===0){
+            const mergeRange = `A22:D22`;
+
+                try {
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet2.mergeCells(mergeRange);
+                worksheet2.getCell("B22").value= "Sin Actualizaciones";
+                worksheet2.getCell('B22').alignment = {
+                horizontal: 'center'
+                };
+
+        }
+
+        
+        updateMerges.forEach(range => {
+        const [start, end] = range.split(':');
+        const colStart = start.match(/^[A-Z]+/)[0];
+        const colEnd   = end  .match(/^[A-Z]+/)[0];
+        for (let i = 1; i < totalActualizaciones; i++) {
+            
+            console.log("rango de merge1: ",`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+            worksheet2.mergeCells(`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+            
+        }
+        });
+
+        actualizaciones.forEach((exp, idx) => {
+        const r = UPDATE_ROW + idx;
+        worksheet2.getCell(`A${r}`).value = exp.tema;
+        worksheet2.getCell(`B${r}`).value = formatearFecha(exp.fecha);
+        worksheet2.getCell(`C${r}`).value = exp.institucion;
+        worksheet2.getCell(`D${r}`).value = exp.documento;
+        /*const mergeRange = `C${r}:D${r}`;
+        console.log(mergeRange);
+        try{
+        worksheet.mergeCells(mergeRange);
+        }catch(err){
+
+        }*/
+    });
+
+     
+
+       
+
+
+        // 1) Si no hay ninguna, borramos la fila base
+        if (prepaCount === 0) {
+                const mergeRange = `B14:G14`;
+
+                try {
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet2.mergeCells(mergeRange);
+                worksheet2.getCell("B14").value= "No";
+                worksheet2.getCell('B14').alignment = {
+                horizontal: 'center'
+                };
+                 worksheet2.getRow(PREPA_START_ROW).hidden = true;
+
+        } else {
+            // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+            if (prepaCount > 1) {
+                // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                worksheet2.duplicateRow(LIC_START_ROW, licCount - 1, true);
+            }
+
+            const start = PREPA_START_ROW;
+            const end = PREPA_START_ROW + prepaCount - 1;
+
+            // 3) Asignamos el encabezado en la primera fila
+            ///worksheet.getCell(`A${start}`).value = "hola";
+
+            /*
+            worksheet.getCell(`A${start}`).alignment = {
+              vertical:   "middle",
+              horizontal: "center",
+              wrapText:   true
+            };*/
+
+            // 4) Llenamos cada fila duplicada con los datos
+            prepa.forEach((exp, i) => {
+                const row = start + i;
+                worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+                worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+                worksheet2.getCell(`D${row}`).value = exp.institucion;
+            });
+
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            if (prepaCount > 1) {
+                const mergeRange = `A${start}:A${end}`;
+                
+                try {
+                    // Intenta desfusionar (no lanza error si no existe)
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                    // Ignora el error si el merge no existe
+                }
+                
+                // Fusiona las celdas
+                worksheet2.mergeCells(mergeRange);
+            }
+        }
+
+        
+
+
+
+
+
+
+
+
+
+        
+        
+        licCount = licenciaturas.length;
+        console.log("lenght lic:" , licCount);
+        acarreo = licCount;
+
+        console.log("acarreo lic: ", acarreo);
+        licDesplazar = 15 + acarreo;
+
+        // 1) Si no hay ninguna, borramos la fila base
+        if (licCount === 0) {
+            const mergeRange = `B${licDesplazar}:G${licDesplazar}`;
+
+                try {
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet2.mergeCells(mergeRange);
+
+                console.log("licdesplazar: ", licDesplazar)
+                worksheet2.getCell(`B${licDesplazar}`).value= "Sin licenciatura";
+                worksheet2.getCell(`B${licDesplazar}`).alignment = {
+                horizontal: 'center'
+                }
+                worksheet2.getRow(LIC_START_ROW).hidden = true;
+
+        } else {
+            // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+
+            if(licCount === 1){
+                acarreo = acarreo - 1;
+            }
+            if (licCount > 1) {
+                acarreo = acarreo - 1;
+
+                console.log("acarrero primero lic: " ,acarreo);
+                // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                worksheet2.duplicateRow(LIC_START_ROW, licCount - 1, true);
+            }
+
+            const start = LIC_START_ROW;
+            const end = LIC_START_ROW + licCount - 1;
+
+            // 3) Asignamos el encabezado en la primera fila
+            ///worksheet.getCell(`A${start}`).value = "hola";
+
+            /*
+            worksheet.getCell(`A${start}`).alignment = {
+              vertical:   "middle",
+              horizontal: "center",
+              wrapText:   true
+            };*/
+
+            // 4) Llenamos cada fila duplicada con los datos
+            licenciaturas.forEach((exp, i) => {
+                const row = start + i;
+                worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+                worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+                worksheet2.getCell(`D${row}`).value = exp.institucion;
+            });
+
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            // 5) Finalmente: si había >1, combinamos la columna A de start a end
+            if (licCount > 1) {
+                const mergeRange = `A${start}:A${end}`;
+                
+                try {
+                    // Intenta desfusionar (no lanza error si no existe)
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                    // Ignora el error si el merge no existe
+                }
+                
+                // Fusiona las celdas
+                worksheet2.mergeCells(mergeRange);
+            }
+        }
+
+
+
+
+
+
+
+        ////////////////////////////////////////////////////////////////////////
+
+
+        
+        MAE_START_ROW = 16 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        
+        
+        
+
+        if (maeCount === 0) {
+            console.log("MAE " , MAE_START_ROW);
+
+            const mergeRange = `B${MAE_START_ROW}:G${MAE_START_ROW}`;
+
+                try {
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet2.mergeCells(mergeRange);
+
+                worksheet2.getCell(`B${MAE_START_ROW}`).value= "Sin maestria";
+                worksheet2.getCell(`B${MAE_START_ROW}`).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                worksheet2.getRow(MAE_START_ROW).hidden = true;
+                
+            ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+        } else {
+        if (maeCount > 1) {
+            acarreo = acarreo + maeCount - 1;
+            worksheet2.duplicateRow(MAE_START_ROW, maeCount - 1, true);
+        }
+
+        const start = MAE_START_ROW;
+
+        console.log ( start, " starto " , licDesplazar);
+        const end   = MAE_START_ROW + maeCount - 1;
+
+        // Encabezado en A (si lo necesitas)
+        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+        maestrias.forEach((exp, i) => {
+            const row = start + i;
+            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+            worksheet2.getCell(`D${row}`).value = exp.institucion;
+        });
+
+        if (maeCount > 1) {
+            const mergeRange = `A${start}:A${end}`;
+            try { worksheet2.unMergeCells(mergeRange); } catch (err) {}
+            try { worksheet2.mergeCells(mergeRange);   } catch (err) {
+            console.warn(`No se pudo mergear ${mergeRange}:`, err);
+            }
+        }
+        }
+
+
+
+
+
+
+
+        ///////////////////////////////////////////////
+
+        
+        console.log("acarreo mae: ", acarreo);
+
+        DOC_START_ROW = 17 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        
+        
+        
+
+        if (docCount === 0) {
+            console.log("DOC " , DOC_START_ROW);
+
+            
+            const mergeRange = `B${DOC_START_ROW}:G${DOC_START_ROW}`;
+            console.log("mergeRange: ",mergeRange);
+
+                try {
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                worksheet2.mergeCells(mergeRange);
+
+                worksheet2.getCell(`B${DOC_START_ROW}`).value= "Sin doctorado";
+                worksheet2.getCell(`B${DOC_START_ROW}`).alignment = {
+                horizontal: 'center'
+                }
+
+                worksheet2.getRow(DOC_START_ROW).hidden = true;
+            ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+        } else {
+        if (docCount > 1) {
+            acarreo = acarreo + docCount - 1;
+            worksheet2.duplicateRow(DOC_START_ROW, docCount - 1, true);
+        }
+
+        const start = DOC_START_ROW;
+
+        const end   = DOC_START_ROW + docCount - 1;
+
+        // Encabezado en A (si lo necesitas)
+        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+        doctorados.forEach((exp, i) => {
+            const row = start + i;
+            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+            worksheet2.getCell(`D${row}`).value = exp.institucion;
+        });
+
+        if (docCount > 1) {
+            const mergeRange = `A${start}:A${end}`;
+            try { worksheet.unMergeCells(mergeRange); } catch (err) {}
+            try { worksheet.mergeCells(mergeRange);   } catch (err) {
+            console.warn(`No se pudo mergear ${mergeRange}:`, err);
+            }
+        }
+    }
+
+
+    console.log("acarreo doc: ", acarreo);
+
+        ESP_START_ROW = 18 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+        
+        
+        
+
+        if (espCount === 0) {
+            console.log("ESP " , ESP_START_ROW);
+
+            const mergeRange = `B${ESP_START_ROW}:G${ESP_START_ROW}`;
+            console.log("mergeRange: ",mergeRange);
+        
+                try {
+                    worksheet2.unMergeCells(mergeRange);
+                } catch (err) {
+                }
+                
+                try {
+                    worksheet2.mergeCells(mergeRange);
+                } catch (err) {
+                }
+                
+
+                worksheet2.getCell(`B${ESP_START_ROW}`).value= "Sin especialidad";
+                worksheet2.getCell(`B${ESP_START_ROW}`).alignment = {
+                horizontal: 'center'
+                }
+
+                worksheet2.getRow(ESP_START_ROW).hidden = true;
+
+                
+            ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+        } else {
+        if (espCount > 1) {
+            acarreo = acarreo + espCount - 1;
+            worksheet2.duplicateRow(ESP_START_ROW, docCount - 1, true);
+        }
+
+        const start = ESP_START_ROW;
+
+        const end   = ESP_START_ROW + docCount - 1;
+
+        // Encabezado en A (si lo necesitas)
+        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+        especialidades.forEach((exp, i) => {
+            const row = start + i;
+            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+            worksheet2.getCell(`D${row}`).value = exp.institucion;
+        });
+
+        if (espCount > 1) {
+            const mergeRange = `A${start}:A${end}`;
+            try { worksheet2.unMergeCells(mergeRange); } catch (err) {}
+            try { worksheet2.mergeCells(mergeRange);   } catch (err) {
+            console.warn(`No se pudo mergear ${mergeRange}:`, err);
+            }
+        }
+
+        
+    }
+
+    if (licCount >= 1 || maeCount >= 1 || docCount >= 1 || espCount >= 1){
+        console.log("Si hay más de una");
+            worksheet2.getRow(11).hidden = true;
+            worksheet2.getRow(12).hidden = true;
+            worksheet2.getRow(13).hidden = true;
+            worksheet2.getRow(14).hidden = true;
+        }
+        
+        
+
+
+
+
+
+        
+
+
+        
+
+
+        
+        const { exec } = require('child_process');
+
+        const rutaExcel = `./reportes/${trabajador.nombreTrabajador}_temp.xlsx`;
+        const rutaPDF = `./reportes/${trabajador.nombreTrabajador}_CURRICULUM_TRANSPARENCIA.pdf`;
+        const rutaHTML = `./reportes/${trabajador.nombreTrabajador}_temp.html`;
+        // 1. Guardar Excel temporal
+        await workbook2.xlsx.writeFile(rutaExcel);
+
+        excelToHtmlWithStyles(rutaExcel, rutaHTML);
+
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+        // Carga el HTML recién creado (asegúrate de resolver la ruta absoluta)
+        await page.goto(`file://${path.resolve(rutaHTML)}`, {
+        waitUntil: 'networkidle0'
+        });
+        await page.pdf({
+        path: rutaPDF,
+        format: 'letter',
+        printBackground: true,
+        margin: { top: '1cm', right: '1cm', bottom: '1cm', left: '1cm' }
+        });
+        await browser.close();
+        
+        
+        fs.unlinkSync(rutaExcel);
+        fs.unlinkSync(rutaHTML);
+
+       
+                
+
+
+
 
         const archiver = require('archiver');
 
         // Crear el archivo ZIP
-        const zipNombre = `reporte_${trabajador.noTrabajador}.zip`;
+        const zipNombre = `reporte_${trabajador.nombreTrabajador}.zip`;
         const zipRuta = path.join('./reportes', zipNombre);
         const output = fs.createWriteStream(zipRuta);
         const archive = archiver('zip', { zlib: { level: 9 } });
@@ -1415,7 +2012,7 @@ await workbook25.xlsx.writeFile(rutaCompleta25);
                     console.error('Error al enviar ZIP:', err);
                 } else {
                     fs.unlinkSync(zipRuta); 
-                    fs.unlinkSync(rutaCompleta); 
+                    fs.unlinkSync(rutaCompleta);
                     ///fs.unlinkSync(rutaCompleta25); 
                 }
             });
@@ -1426,34 +2023,1285 @@ await workbook25.xlsx.writeFile(rutaCompleta25);
         });
 
         archive.pipe(output);
-
+        const carpetaTrabajador = trabajador.nombreTrabajador; // sin modificaciones
         // Adjunta el Excel generado
-        archive.file(rutaCompleta, { name: path.basename(rutaCompleta) });
+        archive.file(rutaCompleta, { name: `${carpetaTrabajador}/${path.basename(rutaCompleta)}` });
+        archive.file(rutaPDF, { name: `${carpetaTrabajador}/${path.basename(rutaPDF)}` });
         //archive.file(rutaCompleta25, { name: path.basename(rutaCompleta25) });
 
         // Archivos PDF
         const uploadsPath = path.join(__dirname, 'uploads');
         const pdfs = [
-            `${trabajador.nombreTrabajador}-ine_pdf.pdf`,
-            `acta_pdf-${trabajador.noTrabajador}.pdf`,
-            `comprobante_domicilio_pdf-${trabajador.noTrabajador}.pdf`,
-            `comprobante_fiscal_pdf-${trabajador.noTrabajador}.pdf`
+            `${trabajador.nombreTrabajador}_INE.pdf`,
+            `${trabajador.nombreTrabajador}_ACTA-NACIMIENTO.pdf`,
+            `${trabajador.nombreTrabajador}_COMPROBANTE-DOMICILIO.pdf`,
+            `${trabajador.nombreTrabajador}_RFC.pdf`,
+            `${trabajador.nombreTrabajador}_GRADO-ESTUDIOS.pdf`
         ];
 
         pdfs.forEach(nombre => {
             const ruta = path.join(uploadsPath, nombre);
             if (fs.existsSync(ruta)) {
-                archive.file(ruta, { name: nombre });
+                archive.file(ruta, { name: `${carpetaTrabajador}/${nombre}` });
             }
         });
 
         await archive.finalize();
+        
+        fs.unlinkSync(rutaPDF);
 
     } catch (error) {
         console.error('Error generando el reporte:', error);
         res.status(500).send('Error interno del servidor');
     }
 });
+
+
+
+app.get('/generar-reportes-todos', async (req, res) => {
+    const archiver = require('archiver');
+    try {
+        // Obtener todos los trabajadores
+        const [todosTrabajadores] = await db.query('SELECT * FROM trabajador');
+
+        // Crear el archivo ZIP principal
+        const zipNombre = `todos_trabajadores_${Date.now()}.zip`;
+        const zipRuta = path.join('./reportes', zipNombre);
+        const output = fs.createWriteStream(zipRuta);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        // Manejador para cuando se cierre el ZIP
+        output.on('close', () => {
+            console.log(`📦 ZIP creado con ${archive.pointer()} bytes`);
+            res.download(zipRuta, (err) => {
+                if (err) {
+                    console.error('Error al enviar ZIP:', err);
+                } else {
+                    // Limpiar archivos temporales después de enviar
+                    fs.unlinkSync(zipRuta);
+
+                    // Eliminar archivos generados para cada trabajador
+                    todosTrabajadores.forEach(t => {
+                        const base = `./reportes/${t.nombreTrabajador}_`;
+                        try {
+                            fs.unlinkSync(`${base}CURRICULUM-EDITABLE.xlsx`);
+                            fs.unlinkSync(`${base}CURRICULUM_TRANSPARENCIA.pdf`);
+                        } catch (e) {
+                            console.warn(`No se pudo eliminar archivo de ${t.nombreTrabajador}:`, e.message);
+                        }
+                    });
+                }
+            });
+        });
+
+        archive.on('error', err => {
+            throw err;
+        });
+
+        archive.pipe(output);
+
+        // ===================================================================
+        // INICIO DEL CICLO PARA CADA TRABAJADOR - AQUÍ VA TU CÓDIGO EXISTENTE
+        // ===================================================================
+        for (const trabajador of todosTrabajadores) {
+            const noTrabajador = trabajador.noTrabajador;
+            const nombreTrabajador = trabajador.nombreTrabajador;
+
+            try {
+                // ------ COMIENZA TU CÓDIGO ACTUAL (desde const rutaPlantilla...) ------
+                const rutaPlantilla = './plantillas/curriculum.xlsx';
+
+                
+
+                    const [trabajadorRows] = await db.query('SELECT * FROM trabajador WHERE noTrabajador = ?', [noTrabajador]);
+                    const trabajador = trabajadorRows[0];
+                    const idTrabajador = trabajador.idTrabajador;
+
+                    if (!trabajador) {
+                        return res.status(404).send('No se encontró el trabajador');
+                    }
+
+
+                    const [hijos] = await db.query('SELECT * FROM hijo WHERE idTrabajador = ?', [idTrabajador]);
+
+
+                    const [escolaridades] = await db.query('SELECT * FROM escolaridad WHERE idTrabajador = ?', [idTrabajador]);
+
+                    const [actualizaciones] = await db.query('SELECT * FROM actualizacionprofesional WHERE idTrabajador = ?', [idTrabajador]);
+                    ///const [experiencias] = await db.query('SELECT * FROM experienciapj WHERE idTrabajador = ?', [idTrabajador]);
+
+                    ///console.log(experiencias)
+
+                    const [experiencias] = await db.query('SELECT * FROM experienciapj WHERE idTrabajador = ?', [idTrabajador]);
+
+                    console.log('Resultados:', experiencias);
+                    console.log('Total:', experiencias.length);
+                    console.log('ID del trabajador recibido:', idTrabajador);
+
+
+                    const workbook = new ExcelJS.Workbook();
+                    await workbook.xlsx.readFile(rutaPlantilla);
+                    const worksheet = workbook.worksheets[0];
+                    worksheet.getCell('B7').value = trabajador.nombreTrabajador;
+                    worksheet.getCell('B11').value = trabajador.primaria;
+                    worksheet.getCell('B12').value = trabajador.secundaria;
+                    worksheet.getCell('B13').value = trabajador.carreraTecnicaComercial;
+
+                    const bachillerato = escolaridades.filter(
+                        exp => exp.nivelAcademico.toUpperCase() === "BACHILLERATO"
+                    );
+                    bachillerato.forEach((exp, index) => {
+                        const fila = 14 + index; // Empieza en la fila 14, 15, 16…
+                        // Usando template literals con backticks:
+                        worksheet.getCell(`B${fila}`).value = exp.nombreTitulo;
+                        worksheet.getCell(`C${fila}`).value = exp.fechaObtencion;
+                        worksheet.getCell(`D${fila}`).value = exp.institucion;
+                        worksheet.getCell(`E${fila}`).value = exp.documentoAdquirido;
+                        worksheet.getCell(`F${fila}`).value = exp.estatus;
+                    });
+
+                    /*worksheet.duplicateRow(29,1, true);
+                    worksheet.getCell("A30").value = "HOLAAA";
+            */
+
+                    ///////////////////////////////////////////////////////////
+
+
+                    const EXPERIENCE_ROW = 26;
+                    const expMerges = [];
+                    worksheet.model.merges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const startRow = +start.match(/\d+$/)[0];
+                        const endRow = +end.match(/\d+$/)[0];
+                        if (startRow === EXPERIENCE_ROW && endRow === EXPERIENCE_ROW) {
+                            expMerges.push(range);
+                        }
+                    });
+
+                    const experienciasPJ = experiencias
+                    const totalExp = experienciasPJ.length;
+
+                    if (totalExp === 0) {
+                        const mergeRange = `A26:D26`;
+
+                        try {
+                            worksheet.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet.mergeCells(mergeRange);
+                        worksheet.getCell("A26").value = "Sin Experiencias";
+                        worksheet.getCell('A26').alignment = {
+                            horizontal: 'center'
+                        };
+
+                    }
+                    if (totalExp > 1) {
+                        worksheet.duplicateRow(EXPERIENCE_ROW, totalExp - 1, true);
+                    }
+
+                    expMerges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const colStart = start.match(/^[A-Z]+/)[0];
+                        const colEnd = end.match(/^[A-Z]+/)[0];
+                        for (let i = 1; i < totalExp; i++) {
+                            worksheet.mergeCells(`${colStart}${EXPERIENCE_ROW + i}:${colEnd}${EXPERIENCE_ROW + i}`);
+                        }
+                    });
+
+                    experienciasPJ.forEach((exp, idx) => {
+
+                        const r = EXPERIENCE_ROW + idx;
+                        worksheet.getCell(`A${r}`).value = exp.periodoInicio;
+                        worksheet.getCell(`B${r}`).value = exp.periodoFin;
+                        worksheet.getCell(`C${r}`).value = exp.institucion + " / " + exp.adscripcion;
+                        worksheet.getCell(`D${r}`).value = exp.cargo;
+                        worksheet.getCell(`E${r}`).value = exp.campoExperiencia;
+                    });
+
+
+
+
+
+
+
+
+
+
+
+                    ///////////////////////////////////////////////////
+
+
+                    const UPDATE_ROW = 22;
+                    const updateMerges = [];
+
+                    worksheet.model.merges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const startRow = parseInt(start.match(/\d+$/)[0], 10);
+                        const endRow = parseInt(end.match(/\d+$/)[0], 10);
+                        if (startRow === UPDATE_ROW && endRow === UPDATE_ROW) {
+                            updateMerges.push(range);
+                        }
+                    });
+
+                    const totalActualizaciones = actualizaciones.length;
+                    if (totalActualizaciones > 1) {
+                        worksheet.duplicateRow(UPDATE_ROW, totalActualizaciones - 1, true);
+                    }
+
+                    if (totalActualizaciones === 0) {
+                        const mergeRange = `A22:D22`;
+
+                        try {
+                            worksheet.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet.mergeCells(mergeRange);
+                        worksheet.getCell("B22").value = "Sin Actualizaciones";
+                        worksheet.getCell('B22').alignment = {
+                            horizontal: 'center'
+                        };
+
+                    }
+
+
+                    updateMerges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const colStart = start.match(/^[A-Z]+/)[0];
+                        const colEnd = end.match(/^[A-Z]+/)[0];
+                        for (let i = 1; i < totalActualizaciones; i++) {
+
+                            console.log("rango de merge1: ", `${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+                            worksheet.mergeCells(`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+
+                        }
+                    });
+
+                    actualizaciones.forEach((exp, idx) => {
+                        const r = UPDATE_ROW + idx;
+                        worksheet.getCell(`A${r}`).value = exp.tema;
+                        worksheet.getCell(`B${r}`).value = formatearFecha(exp.fecha);
+                        worksheet.getCell(`C${r}`).value = exp.institucion;
+                        worksheet.getCell(`D${r}`).value = exp.documento;
+                        /*const mergeRange = `C${r}:D${r}`;
+                        console.log(mergeRange);
+                        try{
+                        worksheet.mergeCells(mergeRange);
+                        }catch(err){
+                
+                        }*/
+                    });
+
+
+
+                    const PREPA_START_ROW = 14;
+                    const prepa = escolaridades.filter(e =>
+                        e.nivelAcademico.toUpperCase() === "BACHILLERATO"
+                    );
+                    const prepaCount = prepa.length;
+
+
+                    // 1) Si no hay ninguna, borramos la fila base
+                    if (prepaCount === 0) {
+                        const mergeRange = `B14:G14`;
+
+                        try {
+                            worksheet.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet.mergeCells(mergeRange);
+                        worksheet.getCell("B14").value = "No";
+                        worksheet.getCell('B14').alignment = {
+                            horizontal: 'center'
+                        };
+                        worksheet.getRow(PREPA_START_ROW).hidden = true;
+
+                    } else {
+                        // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+                        if (prepaCount > 1) {
+                            // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                            worksheet.duplicateRow(LIC_START_ROW, licCount - 1, true);
+                        }
+
+                        const start = PREPA_START_ROW;
+                        const end = PREPA_START_ROW + prepaCount - 1;
+
+                        // 3) Asignamos el encabezado en la primera fila
+                        ///worksheet.getCell(`A${start}`).value = "hola";
+
+                        /*
+                        worksheet.getCell(`A${start}`).alignment = {
+                          vertical:   "middle",
+                          horizontal: "center",
+                          wrapText:   true
+                        };*/
+
+                        // 4) Llenamos cada fila duplicada con los datos
+                        prepa.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet.getCell(`D${row}`).value = exp.institucion;
+                            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+                            worksheet.getCell(`F${row}`).value = exp.estatus;
+                        });
+
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        if (prepaCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+
+                            try {
+                                // Intenta desfusionar (no lanza error si no existe)
+                                worksheet.unMergeCells(mergeRange);
+                            } catch (err) {
+                                // Ignora el error si el merge no existe
+                            }
+
+                            // Fusiona las celdas
+                            worksheet.mergeCells(mergeRange);
+                        }
+                    }
+
+
+
+
+
+
+
+
+
+                    let LIC_START_ROW = 15;
+                    const licenciaturas = escolaridades.filter(e =>
+                        e.nivelAcademico.toUpperCase() === "LICENCIATURA"
+                    );
+                    let licCount = licenciaturas.length;
+                    console.log("lenght lic:", licCount);
+                    let acarreo = licCount;
+
+                    console.log("acarreo lic: ", acarreo);
+                    let licDesplazar = 15 + acarreo;
+
+                    // 1) Si no hay ninguna, borramos la fila base
+                    if (licCount === 0) {
+                        const mergeRange = `B${licDesplazar}:G${licDesplazar}`;
+
+                        try {
+                            worksheet.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet.mergeCells(mergeRange);
+
+                        console.log("licdesplazar: ", licDesplazar)
+                        worksheet.getCell(`B${licDesplazar}`).value = "Sin licenciatura";
+                        worksheet.getCell(`B${licDesplazar}`).alignment = {
+                            horizontal: 'center'
+                        }
+                        worksheet.getRow(LIC_START_ROW).hidden = true;
+
+                    } else {
+                        // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+
+                        if (licCount === 1) {
+                            acarreo = acarreo - 1;
+                        }
+                        if (licCount > 1) {
+                            acarreo = acarreo - 1;
+
+                            console.log("acarrero primero lic: ", acarreo);
+                            // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                            worksheet.duplicateRow(LIC_START_ROW, licCount - 1, true);
+                        }
+
+                        const start = LIC_START_ROW;
+                        const end = LIC_START_ROW + licCount - 1;
+
+                        // 3) Asignamos el encabezado en la primera fila
+                        ///worksheet.getCell(`A${start}`).value = "hola";
+
+                        /*
+                        worksheet.getCell(`A${start}`).alignment = {
+                          vertical:   "middle",
+                          horizontal: "center",
+                          wrapText:   true
+                        };*/
+
+                        // 4) Llenamos cada fila duplicada con los datos
+                        licenciaturas.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet.getCell(`D${row}`).value = exp.institucion;
+                            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+                            worksheet.getCell(`F${row}`).value = exp.estatus;
+                            worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
+                        });
+
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        if (licCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+
+                            try {
+                                // Intenta desfusionar (no lanza error si no existe)
+                                worksheet.unMergeCells(mergeRange);
+                            } catch (err) {
+                                // Ignora el error si el merge no existe
+                            }
+
+                            // Fusiona las celdas
+                            worksheet.mergeCells(mergeRange);
+                        }
+                    }
+
+
+
+
+
+
+
+                    ////////////////////////////////////////////////////////////////////////
+
+
+
+                    let MAE_START_ROW = 16 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+                    const maestrias = escolaridades.filter(e =>
+                        e.nivelAcademico.toUpperCase() === "MAESTRIA"
+                    );
+                    let maeCount = maestrias.length;
+
+
+
+                    if (maeCount === 0) {
+                        console.log("MAE ", MAE_START_ROW);
+
+                        const mergeRange = `B${MAE_START_ROW}:G${MAE_START_ROW}`;
+
+                        try {
+                            worksheet.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet.mergeCells(mergeRange);
+
+                        worksheet.getCell(`B${MAE_START_ROW}`).value = "Sin maestria";
+                        worksheet.getCell(`B${MAE_START_ROW}`).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                        worksheet.getRow(MAE_START_ROW).hidden = true;
+
+                        ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+                    } else {
+                        if (maeCount > 1) {
+                            acarreo = acarreo + maeCount - 1;
+                            worksheet.duplicateRow(MAE_START_ROW, maeCount - 1, true);
+                        }
+
+                        const start = MAE_START_ROW;
+
+                        console.log(start, " starto ", licDesplazar);
+                        const end = MAE_START_ROW + maeCount - 1;
+
+                        // Encabezado en A (si lo necesitas)
+                        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+                        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+                        maestrias.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet.getCell(`D${row}`).value = exp.institucion;
+                            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+                            worksheet.getCell(`F${row}`).value = exp.estatus;
+                            worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
+                        });
+
+                        if (maeCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+                            try { worksheet.unMergeCells(mergeRange); } catch (err) { }
+                            try { worksheet.mergeCells(mergeRange); } catch (err) {
+                                console.warn(`No se pudo mergear ${mergeRange}:`, err);
+                            }
+                        }
+                    }
+
+
+
+
+
+
+
+                    ///////////////////////////////////////////////
+
+
+                    console.log("acarreo mae: ", acarreo);
+
+                    let DOC_START_ROW = 17 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+                    const doctorados = escolaridades.filter(e =>
+                        e.nivelAcademico.toUpperCase() === "DOCTORADO"
+                    );
+                    let docCount = doctorados.length;
+
+
+
+                    if (docCount === 0) {
+                        console.log("DOC ", DOC_START_ROW);
+
+
+                        const mergeRange = `B${DOC_START_ROW}:G${DOC_START_ROW}`;
+                        console.log("mergeRange: ", mergeRange);
+
+                        try {
+                            worksheet.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet.mergeCells(mergeRange);
+
+                        worksheet.getCell(`B${DOC_START_ROW}`).value = "Sin doctorado";
+                        worksheet.getCell(`B${DOC_START_ROW}`).alignment = {
+                            horizontal: 'center'
+                        }
+
+                        worksheet.getRow(DOC_START_ROW).hidden = true;
+                        ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+                    } else {
+                        if (docCount > 1) {
+                            acarreo = acarreo + docCount - 1;
+                            worksheet.duplicateRow(DOC_START_ROW, docCount - 1, true);
+                        }
+
+                        const start = DOC_START_ROW;
+
+                        const end = DOC_START_ROW + docCount - 1;
+
+                        // Encabezado en A (si lo necesitas)
+                        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+                        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+                        doctorados.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet.getCell(`D${row}`).value = exp.institucion;
+                            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+                            worksheet.getCell(`F${row}`).value = exp.estatus;
+                            worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
+                        });
+
+                        if (docCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+                            try { worksheet.unMergeCells(mergeRange); } catch (err) { }
+                            try { worksheet.mergeCells(mergeRange); } catch (err) {
+                                console.warn(`No se pudo mergear ${mergeRange}:`, err);
+                            }
+                        }
+                    }
+
+
+                    console.log("acarreo doc: ", acarreo);
+
+                    let ESP_START_ROW = 18 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+                    const especialidades = escolaridades.filter(e =>
+                        e.nivelAcademico.toUpperCase() === "ESPECIALIDAD"
+                    );
+                    let espCount = especialidades.length;
+
+
+
+                    if (espCount === 0) {
+                        console.log("ESP ", ESP_START_ROW);
+
+                        const mergeRange = `B${ESP_START_ROW}:G${ESP_START_ROW}`;
+                        console.log("mergeRange: ", mergeRange);
+
+                        try {
+                            worksheet.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+
+                        try {
+                            worksheet.mergeCells(mergeRange);
+                        } catch (err) {
+                        }
+
+
+                        worksheet.getCell(`B${ESP_START_ROW}`).value = "Sin especialidad";
+                        worksheet.getCell(`B${ESP_START_ROW}`).alignment = {
+                            horizontal: 'center'
+                        }
+
+                        worksheet.getRow(ESP_START_ROW).hidden = true;
+
+
+                        ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+                    } else {
+                        if (espCount > 1) {
+                            acarreo = acarreo + espCount - 1;
+                            worksheet.duplicateRow(ESP_START_ROW, docCount - 1, true);
+                        }
+
+                        const start = ESP_START_ROW;
+
+                        const end = ESP_START_ROW + docCount - 1;
+
+                        // Encabezado en A (si lo necesitas)
+                        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+                        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+                        especialidades.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet.getCell(`D${row}`).value = exp.institucion;
+                            worksheet.getCell(`E${row}`).value = exp.documentoAdquirido;
+                            worksheet.getCell(`F${row}`).value = exp.estatus;
+                            worksheet.getCell(`G${row}`).value = exp.cedulaProfesional;
+                        });
+
+                        if (espCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+                            try { worksheet.unMergeCells(mergeRange); } catch (err) { }
+                            try { worksheet.mergeCells(mergeRange); } catch (err) {
+                                console.warn(`No se pudo mergear ${mergeRange}:`, err);
+                            }
+                        }
+                    }
+
+
+
+
+
+
+
+
+
+
+
+
+                    const rutaSalida = './reportes/';
+                    const nombreArchivo = `${trabajador.nombreTrabajador}_CURRICULUM-EDITABLE.xlsx`;
+                    const rutaCompleta = path.join(rutaSalida, nombreArchivo);
+
+                    await workbook.xlsx.writeFile(rutaCompleta);
+
+
+
+
+                    ////////////////////////////////////////////////////////////////////
+                    /////////////////////////////////////////////////////////////////////////
+                    //////////////////////////////////////////////////////////////////////
+
+
+
+                    const rutaPlantilla2 = './plantillas/curriculum2.xlsx';
+
+                    const workbook2 = new ExcelJS.Workbook();
+                    await workbook2.xlsx.readFile(rutaPlantilla2);
+                    const worksheet2 = workbook2.worksheets[0];
+
+                    worksheet2.getCell('B7').value = trabajador.nombreTrabajador;
+                    worksheet2.getCell('B11').value = trabajador.primaria;
+                    worksheet2.getCell('B12').value = trabajador.secundaria;
+                    worksheet2.getCell('B13').value = trabajador.carreraTecnicaComercial;
+
+
+                    bachillerato.forEach((exp, index) => {
+                        const fila = 14 + index; // Empieza en la fila 14, 15, 16…
+                        // Usando template literals con backticks:
+                        worksheet2.getCell(`B${fila}`).value = exp.nombreTitulo;
+                        worksheet2.getCell(`C${fila}`).value = exp.fechaObtencion;
+                        worksheet2.getCell(`D${fila}`).value = exp.institucion;
+                    });
+
+                    /*worksheet.duplicateRow(29,1, true);
+                    worksheet.getCell("A30").value = "HOLAAA";
+            */
+
+                    ///////////////////////////////////////////////////////////
+
+
+
+                    worksheet2.model.merges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const startRow = +start.match(/\d+$/)[0];
+                        const endRow = +end.match(/\d+$/)[0];
+                        if (startRow === EXPERIENCE_ROW && endRow === EXPERIENCE_ROW) {
+                            expMerges.push(range);
+                        }
+                    });
+
+
+
+
+                    if (totalExp === 0) {
+                        const mergeRange = `A26:E26`;
+
+                        try {
+                            worksheet2.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet2.mergeCells(mergeRange);
+                        worksheet2.getCell("A26").value = "Sin Experiencias";
+                        worksheet2.getCell('A26').alignment = {
+                            horizontal: 'center'
+                        };
+
+                    }
+                    if (totalExp > 1) {
+                        worksheet2.duplicateRow(EXPERIENCE_ROW, totalExp - 1, true);
+                    }
+
+                    expMerges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const colStart = start.match(/^[A-Z]+/)[0];
+                        const colEnd = end.match(/^[A-Z]+/)[0];
+                        for (let i = 1; i < totalExp; i++) {
+                            worksheet2.mergeCells(`${colStart}${EXPERIENCE_ROW + i}:${colEnd}${EXPERIENCE_ROW + i}`);
+                        }
+                    });
+
+                    experienciasPJ.forEach((exp, idx) => {
+
+                        const r = EXPERIENCE_ROW + idx;
+                        worksheet2.getCell(`A${r}`).value = exp.periodoInicio;
+                        worksheet2.getCell(`B${r}`).value = exp.periodoFin;
+                        worksheet2.getCell(`C${r}`).value = exp.institucion;
+
+                        if (worksheet2.getCell(`C${r}`).value == "PODER JUDICIAL DEL ESTADO DE HIDALGO") {
+                            worksheet2.getCell(`C${r}`).value = exp.institucion + "/" + exp.adscripcion;
+                        }
+                        worksheet2.getCell(`D${r}`).value = exp.cargo;
+                        worksheet2.getCell(`E${r}`).value = exp.campoExperiencia;
+                    });
+
+
+
+
+
+
+
+
+
+
+
+                    ///////////////////////////////////////////////////
+
+
+
+                    worksheet2.model.merges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const startRow = parseInt(start.match(/\d+$/)[0], 10);
+                        const endRow = parseInt(end.match(/\d+$/)[0], 10);
+                        if (startRow === UPDATE_ROW && endRow === UPDATE_ROW) {
+                            updateMerges.push(range);
+                        }
+                    });
+
+                    if (totalActualizaciones > 1) {
+                        worksheet2.duplicateRow(UPDATE_ROW, totalActualizaciones - 1, true);
+                    }
+
+                    if (totalActualizaciones === 0) {
+                        const mergeRange = `A22:D22`;
+
+                        try {
+                            worksheet2.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet2.mergeCells(mergeRange);
+                        worksheet2.getCell("B22").value = "Sin Actualizaciones";
+                        worksheet2.getCell('B22').alignment = {
+                            horizontal: 'center'
+                        };
+
+                    }
+
+
+                    updateMerges.forEach(range => {
+                        const [start, end] = range.split(':');
+                        const colStart = start.match(/^[A-Z]+/)[0];
+                        const colEnd = end.match(/^[A-Z]+/)[0];
+                        for (let i = 1; i < totalActualizaciones; i++) {
+
+                            console.log("rango de merge1: ", `${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+                            worksheet2.mergeCells(`${colStart}${UPDATE_ROW + i}:${colEnd}${UPDATE_ROW + i}`);
+
+                        }
+                    });
+
+                    actualizaciones.forEach((exp, idx) => {
+                        const r = UPDATE_ROW + idx;
+                        worksheet2.getCell(`A${r}`).value = exp.tema;
+                        worksheet2.getCell(`B${r}`).value = formatearFecha(exp.fecha);
+                        worksheet2.getCell(`C${r}`).value = exp.institucion;
+                        worksheet2.getCell(`D${r}`).value = exp.documento;
+                        /*const mergeRange = `C${r}:D${r}`;
+                        console.log(mergeRange);
+                        try{
+                        worksheet.mergeCells(mergeRange);
+                        }catch(err){
+                
+                        }*/
+                    });
+
+
+
+
+
+
+                    // 1) Si no hay ninguna, borramos la fila base
+                    if (prepaCount === 0) {
+                        const mergeRange = `B14:G14`;
+
+                        try {
+                            worksheet2.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet2.mergeCells(mergeRange);
+                        worksheet2.getCell("B14").value = "No";
+                        worksheet2.getCell('B14').alignment = {
+                            horizontal: 'center'
+                        };
+                        worksheet2.getRow(PREPA_START_ROW).hidden = true;
+
+                    } else {
+                        // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+                        if (prepaCount > 1) {
+                            // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                            worksheet2.duplicateRow(LIC_START_ROW, licCount - 1, true);
+                        }
+
+                        const start = PREPA_START_ROW;
+                        const end = PREPA_START_ROW + prepaCount - 1;
+
+                        // 3) Asignamos el encabezado en la primera fila
+                        ///worksheet.getCell(`A${start}`).value = "hola";
+
+                        /*
+                        worksheet.getCell(`A${start}`).alignment = {
+                          vertical:   "middle",
+                          horizontal: "center",
+                          wrapText:   true
+                        };*/
+
+                        // 4) Llenamos cada fila duplicada con los datos
+                        prepa.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet2.getCell(`D${row}`).value = exp.institucion;
+                        });
+
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        if (prepaCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+
+                            try {
+                                // Intenta desfusionar (no lanza error si no existe)
+                                worksheet2.unMergeCells(mergeRange);
+                            } catch (err) {
+                                // Ignora el error si el merge no existe
+                            }
+
+                            // Fusiona las celdas
+                            worksheet2.mergeCells(mergeRange);
+                        }
+                    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    licCount = licenciaturas.length;
+                    console.log("lenght lic:", licCount);
+                    acarreo = licCount;
+
+                    console.log("acarreo lic: ", acarreo);
+                    licDesplazar = 15 + acarreo;
+
+                    // 1) Si no hay ninguna, borramos la fila base
+                    if (licCount === 0) {
+                        const mergeRange = `B${licDesplazar}:G${licDesplazar}`;
+
+                        try {
+                            worksheet2.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet2.mergeCells(mergeRange);
+
+                        console.log("licdesplazar: ", licDesplazar)
+                        worksheet2.getCell(`B${licDesplazar}`).value = "Sin licenciatura";
+                        worksheet2.getCell(`B${licDesplazar}`).alignment = {
+                            horizontal: 'center'
+                        }
+                        worksheet2.getRow(LIC_START_ROW).hidden = true;
+
+                    } else {
+                        // 2) Si hay más de 1, duplicamos la fila base licCount-1 veces
+
+                        if (licCount === 1) {
+                            acarreo = acarreo - 1;
+                        }
+                        if (licCount > 1) {
+                            acarreo = acarreo - 1;
+
+                            console.log("acarrero primero lic: ", acarreo);
+                            // (filaBase, númeroDeDuplicados, insert => true para desplazar filas hacia abajo)
+                            worksheet2.duplicateRow(LIC_START_ROW, licCount - 1, true);
+                        }
+
+                        const start = LIC_START_ROW;
+                        const end = LIC_START_ROW + licCount - 1;
+
+                        // 3) Asignamos el encabezado en la primera fila
+                        ///worksheet.getCell(`A${start}`).value = "hola";
+
+                        /*
+                        worksheet.getCell(`A${start}`).alignment = {
+                          vertical:   "middle",
+                          horizontal: "center",
+                          wrapText:   true
+                        };*/
+
+                        // 4) Llenamos cada fila duplicada con los datos
+                        licenciaturas.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet2.getCell(`D${row}`).value = exp.institucion;
+                        });
+
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        // 5) Finalmente: si había >1, combinamos la columna A de start a end
+                        if (licCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+
+                            try {
+                                // Intenta desfusionar (no lanza error si no existe)
+                                worksheet2.unMergeCells(mergeRange);
+                            } catch (err) {
+                                // Ignora el error si el merge no existe
+                            }
+
+                            // Fusiona las celdas
+                            worksheet2.mergeCells(mergeRange);
+                        }
+                    }
+
+
+
+
+
+
+
+                    ////////////////////////////////////////////////////////////////////////
+
+
+
+                    MAE_START_ROW = 16 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+
+
+
+
+                    if (maeCount === 0) {
+                        console.log("MAE ", MAE_START_ROW);
+
+                        const mergeRange = `B${MAE_START_ROW}:G${MAE_START_ROW}`;
+
+                        try {
+                            worksheet2.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet2.mergeCells(mergeRange);
+
+                        worksheet2.getCell(`B${MAE_START_ROW}`).value = "Sin maestria";
+                        worksheet2.getCell(`B${MAE_START_ROW}`).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                        worksheet2.getRow(MAE_START_ROW).hidden = true;
+
+                        ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+                    } else {
+                        if (maeCount > 1) {
+                            acarreo = acarreo + maeCount - 1;
+                            worksheet2.duplicateRow(MAE_START_ROW, maeCount - 1, true);
+                        }
+
+                        const start = MAE_START_ROW;
+
+                        console.log(start, " starto ", licDesplazar);
+                        const end = MAE_START_ROW + maeCount - 1;
+
+                        // Encabezado en A (si lo necesitas)
+                        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+                        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+                        maestrias.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet2.getCell(`D${row}`).value = exp.institucion;
+                        });
+
+                        if (maeCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+                            try { worksheet2.unMergeCells(mergeRange); } catch (err) { }
+                            try { worksheet2.mergeCells(mergeRange); } catch (err) {
+                                console.warn(`No se pudo mergear ${mergeRange}:`, err);
+                            }
+                        }
+                    }
+
+
+
+
+
+
+
+                    ///////////////////////////////////////////////
+
+
+                    console.log("acarreo mae: ", acarreo);
+
+                    DOC_START_ROW = 17 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+
+
+
+
+                    if (docCount === 0) {
+                        console.log("DOC ", DOC_START_ROW);
+
+
+                        const mergeRange = `B${DOC_START_ROW}:G${DOC_START_ROW}`;
+                        console.log("mergeRange: ", mergeRange);
+
+                        try {
+                            worksheet2.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+                        worksheet2.mergeCells(mergeRange);
+
+                        worksheet2.getCell(`B${DOC_START_ROW}`).value = "Sin doctorado";
+                        worksheet2.getCell(`B${DOC_START_ROW}`).alignment = {
+                            horizontal: 'center'
+                        }
+
+                        worksheet2.getRow(DOC_START_ROW).hidden = true;
+                        ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+                    } else {
+                        if (docCount > 1) {
+                            acarreo = acarreo + docCount - 1;
+                            worksheet2.duplicateRow(DOC_START_ROW, docCount - 1, true);
+                        }
+
+                        const start = DOC_START_ROW;
+
+                        const end = DOC_START_ROW + docCount - 1;
+
+                        // Encabezado en A (si lo necesitas)
+                        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+                        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+                        doctorados.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet2.getCell(`D${row}`).value = exp.institucion;
+                        });
+
+                        if (docCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+                            try { worksheet.unMergeCells(mergeRange); } catch (err) { }
+                            try { worksheet.mergeCells(mergeRange); } catch (err) {
+                                console.warn(`No se pudo mergear ${mergeRange}:`, err);
+                            }
+                        }
+                    }
+
+
+                    console.log("acarreo doc: ", acarreo);
+
+                    ESP_START_ROW = 18 + acarreo;  // ← ajusta esta fila al inicio de tu sección "Maestría"
+
+
+
+
+                    if (espCount === 0) {
+                        console.log("ESP ", ESP_START_ROW);
+
+                        const mergeRange = `B${ESP_START_ROW}:G${ESP_START_ROW}`;
+                        console.log("mergeRange: ", mergeRange);
+
+                        try {
+                            worksheet2.unMergeCells(mergeRange);
+                        } catch (err) {
+                        }
+
+                        try {
+                            worksheet2.mergeCells(mergeRange);
+                        } catch (err) {
+                        }
+
+
+                        worksheet2.getCell(`B${ESP_START_ROW}`).value = "Sin especialidad";
+                        worksheet2.getCell(`B${ESP_START_ROW}`).alignment = {
+                            horizontal: 'center'
+                        }
+
+                        worksheet2.getRow(ESP_START_ROW).hidden = true;
+
+
+                        ///worksheet.getRow(MAE_START_ROW+1).hidden = true;
+                    } else {
+                        if (espCount > 1) {
+                            acarreo = acarreo + espCount - 1;
+                            worksheet2.duplicateRow(ESP_START_ROW, docCount - 1, true);
+                        }
+
+                        const start = ESP_START_ROW;
+
+                        const end = ESP_START_ROW + docCount - 1;
+
+                        // Encabezado en A (si lo necesitas)
+                        //  worksheet.getCell(`A${start}`).value = "MAESTRÍA";
+                        //  worksheet.getCell(`A${start}`).alignment = { vertical:"middle", horizontal:"center", wrapText:true };
+
+                        especialidades.forEach((exp, i) => {
+                            const row = start + i;
+                            worksheet2.getCell(`B${row}`).value = exp.nombreTitulo;
+                            worksheet2.getCell(`C${row}`).value = exp.fechaObtencion;
+                            worksheet2.getCell(`D${row}`).value = exp.institucion;
+                        });
+
+                        if (espCount > 1) {
+                            const mergeRange = `A${start}:A${end}`;
+                            try { worksheet2.unMergeCells(mergeRange); } catch (err) { }
+                            try { worksheet2.mergeCells(mergeRange); } catch (err) {
+                                console.warn(`No se pudo mergear ${mergeRange}:`, err);
+                            }
+                        }
+
+
+                    }
+
+                    if (licCount >= 1 || maeCount >= 1 || docCount >= 1 || espCount >= 1) {
+                        console.log("Si hay más de una");
+                        worksheet2.getRow(11).hidden = true;
+                        worksheet2.getRow(12).hidden = true;
+                        worksheet2.getRow(13).hidden = true;
+                        worksheet2.getRow(14).hidden = true;
+                    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    const { exec } = require('child_process');
+
+                    const rutaExcel = `./reportes/${trabajador.nombreTrabajador}_temp.xlsx`;
+                    const rutaPDF = `./reportes/${trabajador.nombreTrabajador}_CURRICULUM_TRANSPARENCIA.pdf`;
+                    const rutaHTML = `./reportes/${trabajador.nombreTrabajador}_temp.html`;
+                    // 1. Guardar Excel temporal
+                    await workbook2.xlsx.writeFile(rutaExcel);
+
+                    excelToHtmlWithStyles(rutaExcel, rutaHTML);
+
+                    const browser = await puppeteer.launch();
+                    const page = await browser.newPage();
+                    // Carga el HTML recién creado (asegúrate de resolver la ruta absoluta)
+                    await page.goto(`file://${path.resolve(rutaHTML)}`, {
+                        waitUntil: 'networkidle0'
+                    });
+                    await page.pdf({
+                        path: rutaPDF,
+                        format: 'letter',
+                        printBackground: true,
+                        margin: { top: '1cm', right: '1cm', bottom: '1cm', left: '1cm' }
+                    });
+                    await browser.close();
+
+
+                    fs.unlinkSync(rutaExcel);
+                    fs.unlinkSync(rutaHTML);
+
+
+
+
+
+                    // ... TODO TU CÓDIGO ACTUAL PARA GENERAR EXCEL Y PDF ...
+                    // (mantén intacta toda la lógica de generación de documentos)
+
+                    // Al final de tu código actual, tendrás estas rutas:
+                    let rutaExcel2 = `./reportes/${nombreTrabajador}_CURRICULUM-EDITABLE.xlsx`;
+                    let rutaPDF2 = `./reportes/${nombreTrabajador}_CURRICULUM_TRANSPARENCIA.pdf`;
+                    // ------ FIN DE TU CÓDIGO ACTUAL ------
+
+                    // Crear carpeta en el ZIP para este trabajador
+                    const carpetaTrabajador = nombreTrabajador.replace(/[^\w\s]/gi, '');
+
+                    // Agregar archivos generados al ZIP
+                    archive.file(rutaExcel2, { 
+            name: `${carpetaTrabajador}/${nombreTrabajador}_CURRICULUM-EDITABLE.xlsx` 
+        });
+        
+        archive.file(rutaPDF2, { 
+            name: `${carpetaTrabajador}/${nombreTrabajador}_CURRICULUM_TRANSPARENCIA.pdf` 
+        });
+
+        // Agregar documentos adicionales con nombre del trabajador
+        const documentos = [
+            'INE.pdf', 
+            'ACTA-NACIMIENTO.pdf',
+            'COMPROBANTE-DOMICILIO.pdf',
+            'RFC.pdf',
+            'GRADO-ESTUDIOS.pdf'
+        ];
+
+        documentos.forEach(doc => {
+            const nombreArchivo = `${nombreTrabajador}_${doc}`;
+            const rutaDoc = path.join('./uploads', nombreArchivo);
+            
+            if (fs.existsSync(rutaDoc)) {
+                archive.file(rutaDoc, { 
+                    name: `${carpetaTrabajador}/${nombreArchivo}` 
+                });
+            }
+        });
+
+                } catch (error) {
+                    console.error(`Error procesando ${nombreTrabajador}:`, error);
+                    // Continuar con el siguiente trabajador aunque falle uno
+                }
+            }
+        // ===================================================================
+        // FIN DEL CICLO PARA CADA TRABAJADOR
+        // ===================================================================
+
+        // Finalizar el ZIP después de procesar todos los trabajadores
+        await archive.finalize();
+
+        } catch (error) {
+            console.error('Error general en el endpoint:', error);
+            res.status(500).send('Error interno del servidor');
+
+        }
+
+    });
+
+
+
 
 // Puerto
 app.listen(3001, () => {
@@ -1462,6 +3310,256 @@ app.listen(3001, () => {
 
 
 
+async function convertExcelToPdf(excelPath, pdfPath) {
+    // 1. Leer el archivo Excel
+    const workbook = XLSX.readFile(excelPath);
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    
+    // 2. Convertir a HTML (automático, sin especificar campos)
+    const html = XLSX.utils.sheet_to_html(worksheet);
+    
+    // 3. Crear archivo HTML temporal
+    const htmlPath = excelPath.replace('.xlsx', '.html');
+    fs.writeFileSync(htmlPath, `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; }
+                table { border-collapse: collapse; width: 100%; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                tr:nth-child(even) { background-color: #f9f9f9; }
+            </style>
+        </head>
+        <body>
+            <h1>Reporte Generado</h1>
+            ${html}
+        </body>
+        </html>
+    `);
+    
+    // 4. Convertir HTML a PDF usando Puppeteer
+    const browser = await puppeteer.launch({ 
+        headless: "new",
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    });
+    const page = await browser.newPage();
+    
+    // Usar file:// para cargar el archivo local
+    await page.goto(`file://${path.resolve(htmlPath)}`, {
+        waitUntil: 'networkidle0'
+    });
+    
+    await page.pdf({
+        path: pdfPath,
+        format: 'letter',
+        printBackground: true,
+        margin: {
+            top: '20mm',
+            bottom: '20mm',
+            left: '10mm',
+            right: '10mm'
+        }
+    });
+    
+    await browser.close();
+    
+    // 5. Eliminar archivo HTML temporal
+    fs.unlinkSync(htmlPath);
+}
+
+function getSafeCellValue(cell) {
+    try {
+        if (cell.value === null) return '';
+        if (cell.value === undefined) return '';
+        if (typeof cell.value === 'object') return JSON.stringify(cell.value);
+        return String(cell.value);
+    } catch (error) {
+        console.error(`Error en celda ${cell.address}: ${error.message}`);
+        return '';
+    }
+}
+async function excelToHtmlWithStyles(excelPath, htmlPath) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(excelPath);
+
+  // Decodifica “A1” → {row:1, col:1}
+  function decodeAddress(address) {
+    const match = address.match(/^([A-Z]+)(\d+)$/);
+    if (!match) throw new Error(`Dirección inválida: ${address}`);
+    const [, letters, number] = match;
+    let col = 0;
+    for (let i = 0; i < letters.length; i++) {
+      col = col * 26 + (letters.charCodeAt(i) - 64);
+    }
+    return { row: parseInt(number, 10), col };
+  }
+
+  const logoPath = path.join(__dirname, 'public/images', 'pj-logo-verde.png');
+  const logoExt  = path.extname(logoPath).slice(1);               // "png" o "jpg"
+  const logoData = fs.readFileSync(logoPath).toString('base64');
+  const logoSrcLeft  = `data:image/${logoExt};base64,${logoData}`;
 
 
+  const logoPath2 = path.join(__dirname, 'public/images', 'consejo-logo-verde.png');
+  const logoExt2  = path.extname(logoPath2).slice(1);               // "png" o "jpg"
+  const logoData2 = fs.readFileSync(logoPath2).toString('base64');
+  const logoSrcRight = `data:image/${logoExt2};base64,${logoData2}`;
 
+  let html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Reporte Excel</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; }
+    td, th { border: 1px solid #ddd; padding: 8px; }
+    .bold { font-weight: bold; }
+    .italic { font-style: italic; }
+    .underline { text-decoration: underline; }
+    .center { text-align: center; }
+    .right { text-align: right; }
+    .left { text-align: left; }
+  </style>
+</head>
+<body>
+<div style="
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+">
+  <!-- Logo izquierda -->
+  <img src="${logoSrcLeft}" alt="Logo Izquierda" style="height:150px;">
+
+  <!-- Logo derecha -->
+  <img src="${logoSrcRight}" alt="Logo Derecha" style="height:80px;">
+</div>
+`;
+
+  workbook.eachSheet((worksheet) => {
+    html += `<h2></h2><table>`;
+
+    // 1) Merges
+    const merges = worksheet.model.merges || [];
+    const mergedCells = new Map();
+    merges.forEach(range => {
+      const [start, end] = range.split(':');
+      const s = decodeAddress(start);
+      const e = decodeAddress(end);
+      mergedCells.set(`${s.row},${s.col}`, { top: s.row, left: s.col, bottom: e.row, right: e.col });
+      for (let r = s.row; r <= e.row; r++) {
+        for (let c = s.col; c <= e.col; c++) {
+          if (r !== s.row || c !== s.col) mergedCells.set(`${r},${c}`, { merged: true });
+        }
+      }
+    });
+
+    // 2) Filas con límite de 10 vacías seguidas
+    const rowCount = worksheet.rowCount || 0;
+    const MAX_COLUMNS = 5;                              // <-- tu límite
+    const colCount = Math.min(worksheet.columnCount || 0, MAX_COLUMNS); 
+    let emptyStreak = 0;
+    const MAX_EMPTY = 10;
+
+    for (let rowNum = 1; rowNum <= rowCount; rowNum++) {
+      const row = worksheet.getRow(rowNum);
+        if (row.hidden) continue;
+
+
+      // Detectar si fila vacía
+      let isEmpty = true;
+      for (let c = 1; c <= colCount; c++) {
+        if ((row.getCell(c).text || '').toString().trim() !== '') {
+          isEmpty = false;
+          break;
+        }
+      }
+      if (isEmpty) {
+        emptyStreak++;
+        if (emptyStreak >= MAX_EMPTY) break;     // salta todo el resto
+        continue;                                // ignora esta fila
+      }
+      emptyStreak = 0;                           // reinicia racha
+      html += '<tr>';
+
+      // Columnas
+      for (let colNum = 1; colNum <= colCount; colNum++) {
+        const key = `${rowNum},${colNum}`;
+        if (mergedCells.has(key) && mergedCells.get(key).merged) continue;
+
+        const cell = row.getCell(colNum);
+        if (!cell) {
+                    html += '<td></td>';
+                    continue;
+                }
+        const text = getSafeCellValue(cell);
+                const cellStyles = [];
+                const style = cell.style || {};
+
+        // rowspan/colspan
+        let cellAttrs = '';
+        if (mergedCells.has(key) && !mergedCells.get(key).merged) {
+          const rng = mergedCells.get(key);
+          const rs = rng.bottom - rng.top + 1;
+          const cs = rng.right - rng.left + 1;
+          cellAttrs = ` rowspan="${rs}" colspan="${cs}"`;
+        }
+
+        // clases de fuente y alineación
+        const cls = [];
+        if (style.font) {
+          if (style.font.bold)      cls.push('bold');
+          if (style.font.italic)    cls.push('italic');
+          if (style.font.underline) cls.push('underline');
+        }
+        if (style.alignment) {
+          if (style.alignment.horizontal === 'center') cls.push('center');
+          if (style.alignment.horizontal === 'right')  cls.push('right');
+        }
+        const classAttr = cls.length ? ` class="${cls.join(' ')}"` : '';
+
+        // fondo
+        let bg = '';
+        if (style.fill && style.fill.type === 'pattern' && style.fill.fgColor?.argb) {
+          bg = `background-color: #${style.fill.fgColor.argb.slice(2)};`;
+        }
+        // bordes
+        let border = '';
+        ['top','left','bottom','right'].forEach(side => {
+          const b = style.border?.[side];
+          if (b && b.style) {
+            const color = b.color?.argb ? `#${b.color.argb.slice(2)}` : '#000';
+            border += `border-${side}: ${getBorderWidth(b.style)} ${color};`;
+          }
+        });
+        const styleAttr = (bg + border).trim();
+        const styleString = styleAttr ? ` style="${styleAttr}"` : '';
+
+        html += `<td${cellAttrs}${classAttr}${styleString}>${text}</td>`;
+      }
+
+      html += '</tr>';
+    }
+
+    html += '</table>';
+  });
+
+  html += '</body></html>';
+  fs.writeFileSync(htmlPath, html);
+}
+
+function getBorderWidth(s) {
+  return {
+    thin: '1px solid',
+    medium: '2px solid',
+    thick: '3px solid',
+    dashed: '1px dashed',
+    dotted: '1px dotted',
+    double: '3px double',
+    hair: '1px solid'
+  }[s] || '1px solid';
+}
